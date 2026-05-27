@@ -8,9 +8,9 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 
 | Skill | What it does |
 |---|---|
-| [`structured-replies`](./structured-replies) | Shapes every reply: simple questions get a terse direct answer; complex ones get headlines + an optional ASCII visual + brief detail sections. |
-| [`theory-vs-reality`](./theory-vs-reality) | Audits a plan vs the built code by producing an interactive HTML checklist with per-item verdicts pre-filled by parallel subagents. |
-| [`tmp-snapshot`](./tmp-snapshot) | Saves slices of the current conversation to `/tmp/<name>.md` and returns the path plus an outline of every header. |
+| [`structured-replies`](./skills/structured-replies) | Shapes every reply: simple questions get a terse direct answer; complex ones get headlines + an optional ASCII visual + brief detail sections. |
+| [`theory-vs-reality`](./skills/theory-vs-reality) | Audits a plan vs the built code by producing an interactive HTML checklist with per-item verdicts pre-filled by parallel subagents. |
+| [`tmp-snapshot`](./skills/tmp-snapshot) | Saves slices of the current conversation to `/tmp/<name>.md` and returns the path plus an outline of every header. |
 
 ## Install from GitHub
 
@@ -43,18 +43,18 @@ Flags:
 Run from a clone of this repo:
 
 ```bash
-npx -y skills add ./<skill-name> -g -a '*' -y
+npx -y skills add ./skills/<skill-name> -g -a '*' -y
 ```
 
 Example:
 
 ```bash
-npx -y skills add ./theory-vs-reality -g -a '*' -y
+npx -y skills add ./skills/theory-vs-reality -g -a '*' -y
 ```
 
 ## Add a new skill
 
-1. Create `./<skill-name>/SKILL.md`:
+1. Create `./skills/<skill-name>/SKILL.md`:
    ```markdown
    ---
    name: <skill-name>
