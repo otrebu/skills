@@ -11,6 +11,8 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 | [`structured-replies`](./skills/structured-replies) | Shapes every reply: simple questions get a terse direct answer; complex ones get headlines + an optional ASCII visual + brief detail sections. |
 | [`theory-vs-reality`](./skills/theory-vs-reality) | Audits a plan vs the built code by producing an interactive HTML checklist with per-item verdicts pre-filled by parallel subagents. |
 | [`tmp-snapshot`](./skills/tmp-snapshot) | Saves slices of the current conversation to `/tmp/<name>.md` and returns the path plus an outline of every header. |
+| [`topic-to-issue`](./skills/topic-to-issue) | Investigates a topic against the codebase, docs, and web; opens a lean GitHub issue via `gh` only when the work leaves a concrete deferred action. |
+| [`work-tree-canvas`](./skills/work-tree-canvas) | Maintains a persistent Obsidian Canvas of your work tree across sessions — adds nodes for new branches, tracks the current 🎯 focus, keeps the layout tidy. |
 
 ## Install from GitHub
 
