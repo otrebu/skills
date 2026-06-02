@@ -1,6 +1,6 @@
 ---
 name: work-tree-canvas
-description: Maintain a persistent visual work tree in an Obsidian Canvas as you (and the agents you're driving) branch into sub-problems, decisions, and dead ends across sessions. Resolves which canvas to use per project, attaches new nodes to the current 🎯 focus (or asks when ambiguous), and keeps the layout tidy. Use when the user says "add to the tree/canvas", "branch off X", "focus on Y", "tidy the tree", "where was I", "what was I doing", "I lost my place", or otherwise wants to capture / navigate the shape of an ongoing investigation.
+description: Maintain a persistent visual work tree in an Obsidian Canvas as you (and the agents you're driving) branch into sub-problems, decisions, and dead ends across sessions. Resolves which canvas to use per project, attaches new nodes to the current 🎯 focus (or asks when ambiguous), and keeps the layout tidy. Use when the user says "add to the tree/canvas", "branch off X", "focus on Y", "new topic X", "close / finish the X topic", "tidy the tree", "where was I", "what was I doing", "I lost my place", or otherwise wants to capture / navigate the shape of an ongoing investigation.
 ---
 
 # work-tree-canvas
@@ -15,6 +15,7 @@ Built on top of the JSON Canvas 1.0 format used by [`kepano/obsidian-skills/json
 - **Edges are "because of".** A child exists because the parent led you there. Direction matters — fromNode is the cause / context, toNode is the spawned branch.
 - **Exactly one node is 🎯 the current focus.** That's "where I'm thinking from right now". New nodes attach there by default.
 - **`add` does not move focus.** Focus only moves when the user says so. This is what lets you branch sideways without descending forever.
+- **Groups are containers, not units of attention.** A group is a labeled rectangle that wraps a whole branch into one logical topic bucket (e.g. "Auth Server setup"). It carries a lightweight lifecycle of its own (color + emoji: 📌 active → ⏳ in progress → ⛔ blocked → ✅ done) but takes no edges — it just corrals the nodes whose boxes fall inside its rectangle. See the [Groups](#groups) section.
 
 ## Color & emoji taxonomy
 
@@ -29,19 +30,95 @@ There MUST be exactly one node with color `"5"` (current focus). Refocusing move
 | `"5"`  | cyan   | 🎯    | current focus       | Exactly one node at a time |
 | `"6"`  | purple | 🤔    | decision point      | A fork in the road; usually has multiple children |
 
+Groups have their own lightweight lifecycle — also color + emoji — described in the [Groups](#groups) section. Groups never use `"5"`: focus is always a text node.
+
 ## Node text format
 
 ```
 {emoji} {title}
-{YYYY-MM-DD} · {context-tag}
-{optional one-line link or path}
+{YYYY-MM-DD HH:MM}
+{optional one-line description}
+{optional link or path}
 ```
 
 - Title: one line, ≤ 80 chars
-- Context tag: short — e.g. `repo:new-skills`, `pr:#42`, `chat`, `cli`, `obsidian`
+- Timestamp: local date and time to the minute, formatted `YYYY-MM-DD HH:MM`. Read it from the system clock — run `date "+%Y-%m-%d %H:%M"` — never guess or reuse a stale value from earlier in the conversation.
+- Description: optional. One short line (≤ ~100 chars) saying what the node is about or what the next action is. Skip it when the title already carries the meaning — don't pad with an empty line.
 - Link line: include only when there's a concrete file path, URL, PR, or issue worth jumping to. Skip if empty — don't pad with whitespace.
 
 In JSON, newlines inside `text` are a single `\n`, NOT `\\n` (double-backslash renders the literal characters `\n` in Obsidian).
+
+Existing canvases created before a format change aren't auto-migrated: new nodes use the current format; older nodes keep theirs until you next touch them.
+
+## Groups
+
+A group is a `type: "group"` node — a labeled rectangle that wraps one logical topic bucket. Use groups to keep a maturing branch under control: once a branch off the root has become its own topic, wrap it so it reads as a single unit when zoomed out.
+
+### How membership works (read this first)
+
+JSON Canvas groups have **no member list**. A node belongs to a group purely because its box sits inside the group's rectangle — Obsidian computes this geometrically. Three consequences drive everything below:
+
+- **Derive membership on read.** A node is a member of group G if its full box is inside G's rect. The skill recomputes this every invocation; it is never stored.
+- **Snapshot before re-layout.** Because membership is geometric, a `tidy` that moves nodes would lose track of which node belongs to which group. So snapshot each group's member set (by enclosure) BEFORE moving anything, then redraw each rect around its members afterward.
+- **One group per node.** Keep groups non-overlapping so membership stays unambiguous. If an operation would make two groups overlap, shift a neighbor or ASK — never leave them overlapping.
+
+### Group node shape
+
+- `id`: 16-hex-char lowercase, unique across nodes AND edges.
+- `type`: `"group"`.
+- `label`: the lifecycle emoji + the topic name, e.g. `⏳ Auth Server setup` (no timestamp). Groups have no `text` field, so the emoji lives on the `label`.
+- `x` / `y` / `width` / `height`: the enclosing rectangle (see the fit rule).
+- `color`: a preset reflecting the group's lifecycle state (table below). Never `"5"`.
+
+Groups take no edges and are excluded from the one-focus invariant. Unlike the focus marker, any number of groups may share the same lifecycle color.
+
+### Group lifecycle (color + emoji)
+
+A group always carries a state — both a border `color` and a leading emoji on its `label`. New groups start **active**. Move a group along its lifecycle with `update` (e.g. "mark the auth group in progress / blocked / done").
+
+| State         | Color        | Emoji | Meaning |
+|---------------|--------------|-------|---------|
+| active        | yellow `"3"` | 📌    | topic opened, not yet actively worked |
+| in progress   | orange `"2"` | ⏳    | actively being worked right now |
+| blocked       | red `"1"`    | ⛔    | stalled — needs unblocking before it can move |
+| done          | green `"4"`  | ✅    | every thread in the bucket is resolved |
+
+The group emoji set (📌 ⏳ ⛔ ✅) is deliberately distinct from the node emoji set (🔴 💡 ❓ 🟢 🎯 🤔) so a glance tells you whether you're looking at a container or a unit of attention, even though both draw from the same six preset colors.
+
+**Lifecycle changes are manual.** The skill never auto-advances a group — moving focus or adding nodes does not touch its state. The single exception is a *suggestion*, never an automatic change: the **auto-done hint** — when every node inside a group is 🟢 resolved, offer (don't force) to mark the group ✅ done.
+
+### When to create one (ask when unsure, create when obvious, start without)
+
+- **Start ungrouped.** Early on, nodes hang off the focus/root with no group. Don't pre-wrap; the trunk/root normally stays ungrouped for good.
+- **Create silently only when explicit and unambiguous:** "group these as X", "wrap the auth branch into a group called X", "start a group 'X' and add Y under it".
+- **Propose (ASK) when a branch matures:** when a single child-of-root's subtree reaches ≥ 3 nodes and has a clear theme, offer to wrap it — e.g. `That auth branch has 5 nodes — wrap it as a group "Auth Server setup"?`
+- **Never auto-wrap silently.**
+
+### "Topic" means group — map the words to the ops
+
+Users talk about **topics**, not "group nodes". A topic *is* a group (a topic bucket). Two phrasings carry structural intent the skill MUST honor over its own sense of how things relate:
+
+- **"new topic X" / "X as a separate / independent / standalone topic" / "it can live on its own".** Create X as a new **top-level branch off the root** — parent = the root node, NOT the current focus and NOT whatever node you were just discussing, *even when X is obviously related to recent work*. Explicit independence beats inferred relatedness. Start it as a single ungrouped node (per "Start ungrouped"); offer to wrap it in a group once its subtree grows. If the relationship to existing work is worth recording, add one **labeled cross-link** edge (`label: "related to"`) from the related node — but the structural parent stays the root. Never make a node a descendant of the related node when the user asked for a new/independent topic.
+
+- **"closing / closed topic X" / "X topic is done" / "finished the X topic".** This is a **group action on X**, not a new node dangling outside it. Resolve X to a group (fuzzy-match the topic name against group labels; if the user named a node instead, take the group enclosing it), then:
+  1. **All in-group nodes already 🟢 resolved** → mark the group ✅ done (group-lifecycle `update`). If the user handed you a concrete result (a configured hostname, a merged PR), you MAY add one closing node *inside* the group — as a child of the relevant in-group node, so the fit rule grows the rect to include it. A closing node never lands outside the group rect.
+  2. **Group still has open ❓ / 🔴 / 🤔 nodes inside** → **push back.** Name the still-open nodes and ask whether to (a) mark the group ✅ done anyway, or (b) just record the result and leave the group active. Don't silently spawn a node somewhere else on the canvas.
+  3. **No group matches, but the name resolves to an ungrouped branch** (a child-of-root node + its descendants) → the topic was never wrapped. Mark that branch's head node 🟢 resolved (and any open descendants the user means), and offer to `group` the branch so it reads as a closed topic bucket. Add any closing node as a child within that branch.
+  4. **Nothing matches the named topic at all** → ASK which topic they mean (list group labels and depth-1 branch heads), or offer to treat it as a plain node `add`.
+
+### The fit rule (always fit)
+
+A group's rectangle MUST always enclose all its members with a uniform `PAD = 40` on every side. Recompute it on every add-into-group and every tidy:
+
+```
+minX = min(member.x)            ; minY = min(member.y)
+maxX = max(member.x + member.w) ; maxY = max(member.y + member.h)
+group.x      = minX - PAD       ; group.y      = minY - PAD
+group.width  = (maxX - minX) + 2*PAD
+group.height = (maxY - minY) + 2*PAD
+```
+
+Snap `group.x` / `group.y` to multiples of 20. A member's box never pokes outside its group.
 
 ## Resolve the canvas — do this first, every time
 
@@ -73,7 +150,7 @@ Use the absolute path so the vault is implicit.
 When creating a fresh canvas, write a single root node:
 - `id`: fresh 16-hex-char lowercase
 - `type`: `"text"`
-- `text`: `"🎯 <repo-basename>\n<YYYY-MM-DD>\nroot"`
+- `text`: `"🎯 <repo-basename>\n<YYYY-MM-DD HH:MM>\nroot"`
 - `color`: `"5"` (current focus)
 - `x`: 0, `y`: 0, `width`: 320, `height`: 120
 
@@ -88,6 +165,7 @@ Map natural-language intent to one of these. Always: read the canvas → mutate 
 Input: a title; optional explicit parent; optional status (emoji or color).
 
 1. Resolve the parent:
+   - **New/independent topic?** If the user framed this as a "new topic" or said it's separate / independent / standalone / "can live on its own", set the parent to the **root** — not the focus, not the last-discussed node. See ["Topic" means group](#topic-means-group--map-the-words-to-the-ops). (And if the phrasing was instead "*closing* a topic", this isn't an `add` at all — route to the group-close flow there.)
    - If the user named one ("under the auth one"), fuzzy-match against existing node titles. If exactly one matches, use it. If zero or multiple match, ASK with a list.
    - Otherwise, find the current focus (the unique color `"5"` node). If found, use it.
    - If there's no focus AND no parent named, ASK the user to pick a parent from a list of ≤ 6 candidates (top-level nodes + recent additions).
@@ -113,18 +191,41 @@ Input: target node (fuzzy match on title).
 3. New focus: set color `"5"`. Replace the leading emoji on its first line with `🎯 `.
 4. Report: `Refocused 🎯 to "{title}" (was "{old title}", marked {emoji}).`
 
-### `update` — change a node's status
+### `update` — change a node's or group's status
 
-Input: target node + new status (emoji name or color preset).
+Input: target (node or group) + new status.
 
 1. Disambiguate.
-2. Swap the emoji on the first line and set the color to match.
-3. If the user is changing TO 🎯, run `focus` instead (uniqueness).
-4. Report: `"{title}" → {new emoji}.`
+2. **Text node:** swap the emoji on the first line and set `color` to match the node taxonomy. **Group:** swap the lifecycle emoji prefix on the `label` and set `color` to match the group lifecycle.
+3. If the user is changing a node TO 🎯, run `focus` instead (uniqueness).
+4. **Closing a topic** ("topic X is done / closed / finished") is a group action — see ["Topic" means group](#topic-means-group--map-the-words-to-the-ops). In short: mark the group ✅ done only when every node inside is 🟢; if open ❓ / 🔴 / 🤔 nodes remain, push back rather than mark done or spawn an outside node; add any closing node *inside* the group.
+5. Auto-done hint: when marking a group — or any time every node inside a group is 🟢 resolved — surface the offer to mark that group ✅ done.
+6. Report: `"{title}" → {new emoji}.`
+
+### `group` — wrap a branch / create or extend a topic bucket
+
+Input: a set of nodes (named, or "this branch" / "the auth branch" = a node and its descendants) plus a label.
+
+1. Resolve the member set:
+   - "the X branch" / "wrap this": fuzzy-match X to a node; members = that node and all its descendants (follow edges).
+   - "group these": the named nodes (disambiguate each as in `add`).
+2. If a group with that label already exists, extend it (fold the new members in) rather than creating a second one.
+3. Create the group node: fresh 16-hex `id`, `type: "group"`, the `label` prefixed with 📌, and `color: "3"` — i.e. start in the **active** state (see the group lifecycle).
+4. Compute its rectangle via the fit rule around the member set.
+5. If the new rect overlaps an existing group, shift the smaller neighbor group (and its members) clear; ASK if that isn't clean.
+6. Do NOT add edges to/from the group, and do NOT move focus.
+7. Report: `Grouped {N} nodes into "{label}".`
+
+### `ungroup` — remove a topic bucket
+
+Input: target group (fuzzy-match on label).
+
+1. Delete the group node only. Its members are untouched — they keep their positions, edges, and status; they're simply no longer enclosed.
+2. Report: `Ungrouped "{label}" ({N} nodes released).`
 
 ### `tidy` — full re-layout
 
-Run **full tidy** layout (below) on every node. WARN that this overwrites manual position tweaks before doing it; require a yes from the user.
+Snapshot each group's members (by enclosure) first, run **full tidy** layout (below) on every text node, then redraw every group rect via the fit rule. WARN that this overwrites manual position tweaks before doing it; require a yes from the user.
 
 ### `show` — describe current state
 
@@ -132,6 +233,7 @@ Don't try to open the canvas; you can't render it. Instead, report:
 - Canvas path
 - Current focus title
 - Depth-1 branches (root's direct children) with their child counts
+- Groups (topic buckets) with their state emoji and member counts
 - All 🔴 blocker and ❓ open question nodes — these are the "loose ends" worth resurfacing
 
 Keep it ≤ 10 lines. If there are more than ~15 loose ends, summarize counts and list the 5 oldest.
@@ -152,6 +254,7 @@ When adding a child to parent at `(px, py)` that already has `n` children:
 4. Distribute children left-to-right: child `i` (0-indexed) goes at `x = leftmost + i * 360`, `y = py + 200`.
 5. Re-balance: existing siblings move to their new x; if any sibling has its own subtree, shift every descendant by the same `Δx`.
 6. Snap final x values to multiples of 20.
+7. **Groups:** if the parent sits inside a group G, the new child is a member too — after positioning it, grow G via the fit rule to enclose it. If that growth makes G overlap a neighbor group, don't fight it locally: warn and recommend `tidy`, which re-separates groups cleanly.
 
 This keeps a single sibling row centered under its parent without disturbing the rest of the tree.
 
@@ -159,13 +262,15 @@ This keeps a single sibling row centered under its parent without disturbing the
 
 Use the classic layered tidy-tree:
 
-1. Identify the root: the node with no incoming edges. If multiple, pick the oldest (lowest id sort order is fine as a tiebreaker, since ids are random). If there are real cycles, abort and report — don't mangle.
-2. BFS to assign each node a depth `d`. Set `y = d * 200`.
-3. Recursively compute subtree widths: a leaf's width = 360; an internal node's width = `max(360, sum of children's subtree widths)`.
-4. For each parent, place children left-to-right consuming their own subtree widths; horizontally center the parent over its children's combined extent.
-5. Snap final x values to multiples of 20.
+1. Snapshot each group's members by enclosure, then set the group nodes aside — they aren't tree nodes and don't get a depth.
+2. Identify the root: the text node with no incoming edges. If multiple, pick the oldest (lowest id sort order is fine as a tiebreaker, since ids are random). If there are real cycles, abort and report — don't mangle.
+3. BFS to assign each node a depth `d`. Set `y = d * 200`.
+4. Recursively compute subtree widths: a leaf's width = 360; an internal node's width = `max(360, sum of children's subtree widths)`.
+5. For each parent, place children left-to-right consuming their own subtree widths; horizontally center the parent over its children's combined extent.
+6. Snap final x values to multiples of 20.
+7. Redraw each group: recompute its rect via the fit rule around its snapshotted members' new positions. Subtree packing keeps a branch contiguous, so the rect stays clean. If two groups still overlap, push them apart along x — shift the smaller group and all its members — until clear.
 
-Edges and node contents are preserved; only x/y change.
+Edges and node contents are preserved; only x/y (and group rects) change.
 
 ## Self-healing on read
 
@@ -177,6 +282,9 @@ Detect and offer to fix these on every read, before any mutation:
 - **Cycles:** report cycle path; ask to delete one edge.
 - **Duplicate ids:** regenerate ids in place, keeping the rest of the data; report what changed.
 - **`\\n` in node text:** replace with `\n`.
+- **Group no longer encloses a member (or now captures a stranger):** a node drifted out of, or into, a group rect. Re-fit the rect to its intended members; if intent is ambiguous, ASK.
+- **Empty group:** a group encloses zero nodes — offer to delete it.
+- **Overlapping groups:** report the overlap; offer to push them apart (shift the smaller group and its members).
 
 If the user declines a fix, proceed with the operation but warn that the invariant is broken.
 
@@ -193,6 +301,8 @@ The skill MAY attach silently when:
 - The user explicitly named a parent that disambiguates to exactly one node.
 - The user said "and another one" / "another like that" / "a sibling of that" — attach to the SAME parent as the most recent addition in this conversation.
 
+**Explicit independence overrides inferred relatedness.** If the user calls something a "new topic" or says it's separate / independent / standalone / "can live on its own", attach it to the **root** as a new top-level branch — not to the focus, and not to the related node — *even when the new thing clearly grew out of what you were just discussing.* The agent's sense that "B follows from A" is not a reason to make B a child of A once the user has framed B as independent. Capture the relationship, if it's worth keeping, with a single labeled cross-link edge; the structural parent stays the root. When torn between "child of the related node" and "new top-level branch" and the user used any independence wording, choose top-level.
+
 When asking, list ≤ 6 candidates as `{depth-indent}{emoji} {title}` and let the user pick by number or by re-typing a fragment.
 
 ## Validation (before every write)
@@ -207,8 +317,10 @@ Per JSON Canvas 1.0 plus this skill's invariants:
 6. `fromEnd` / `toEnd` ∈ {`none`, `arrow`} when present.
 7. `color` is preset `"1"`–`"6"` or a valid `#RRGGBB` hex.
 8. JSON parses cleanly. Single `\n` for newlines in text.
-9. Exactly one node has color `"5"`.
+9. Exactly one text node has color `"5"` (groups never use it).
 10. No cycles in the edge graph (unless the user explicitly opted in to a cross-link, in which case the edge gets a `label` so it's visually distinct).
+11. Group nodes have a `label` (leading lifecycle emoji + topic) and no `text` / `file` / `url`. Their `color` follows the group lifecycle, not the node taxonomy; they're excluded from rules 3 and 9 (never `"5"`). Groups don't overlap each other.
+12. Every group encloses ≥ 1 node (an empty group is a self-heal target below, not a hard write-block).
 
 If a check fails, don't write — explain which invariant would break and ask.
 
@@ -217,9 +329,15 @@ If a check fails, don't write — explain which invariant would break and ask.
 One line per operation. Examples of the shape:
 
 - `Added "❓ JWT vs session for SSO" under "🎯 Auth rewrite".`
+- `Added "❓ End-to-end connectivity" as a new top-level topic (independent of the "Get domain for dev-2" group).`
+- `Marked group "Get domain for dev-2" ✅ done and added "🟢 host configured" inside it.`
+- `"Get domain for dev-2" still has 1 open node ("❓ Needs to be tested") — mark the group done anyway, or just record the result?`
 - `Refocused 🎯 to "Decide cache layer" (prior focus "API rewrite" marked 🟢 resolved).`
 - `Marked "JWT vs session for SSO" 🔴 blocker.`
 - `Tidied 14 nodes across 4 depths.`
+- `Grouped 5 nodes into "📌 Auth Server setup".`
+- `Marked group "Auth Server setup" ✅ done.`
+- `Ungrouped "Get domain for dev-2" (9 nodes released).`
 - `Working tree → /Users/.../uby_knowledge_vault/work-trees/new-skills.canvas`
 
 Never dump the full canvas JSON in chat. If the user asks "what's in the canvas", use `show`.
