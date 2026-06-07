@@ -1,0 +1,6 @@
+# Generated from wrangler.toml.template at init — instance-specific, not distributed.
+wrangler.toml
+
+# wrangler writes deploy cache here when deploying with --cwd this dir
+.wrangler/
+node_modules/

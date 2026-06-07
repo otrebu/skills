@@ -1,0 +1,18 @@
+# TEMPLATE — committed and generic. Init substitutes __WORKER__ / __SITE__ / __BUCKET__
+# (from the manifest Config) to produce worker/wrangler.toml, which is gitignored.
+# Do not put real values here; edit the manifest Config instead.
+name = "__WORKER__"
+main = "src/index.ts"
+compatibility_date = "2026-01-01"
+
+# No *.workers.dev URL — the ONLY way in is the gated custom domain.
+workers_dev = false
+
+# Whole apex routed to this Worker; Cloudflare Access apps gate specific paths.
+routes = [
+  { pattern = "__SITE__", custom_domain = true }
+]
+
+[[r2_buckets]]
+binding = "ARTIFACTS"
+bucket_name = "__BUCKET__"

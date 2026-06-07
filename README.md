@@ -8,6 +8,7 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 
 | Skill | What it does |
 |---|---|
+| [`publish-artifacts`](./skills/publish-artifacts) | Publishes a local HTML artifact tree to `ubuilt.dev` (Cloudflare R2 + Worker), mapping folders to URL paths, with per-folder access — public, or gated to named collaborators by email one-time-PIN. Additive and multi-machine safe. |
 | [`structured-replies`](./skills/structured-replies) | Shapes every reply: simple questions get a terse direct answer; complex ones get headlines + an optional ASCII visual + brief detail sections. |
 | [`theory-vs-reality`](./skills/theory-vs-reality) | Audits a plan vs the built code by producing an interactive HTML checklist with per-item verdicts pre-filled by parallel subagents. |
 | [`tmp-snapshot`](./skills/tmp-snapshot) | Saves slices of the current conversation to `/tmp/<name>.md` and returns the path plus an outline of every header. |
