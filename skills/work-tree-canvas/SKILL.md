@@ -1,6 +1,6 @@
 ---
 name: work-tree-canvas
-description: Maintain a persistent visual work tree in an Obsidian Canvas as you (and the agents you're driving) branch into sub-problems, decisions, and dead ends across sessions. Resolves which canvas to use per project, attaches new nodes to the current 🎯 focus (or asks when ambiguous), and keeps the layout tidy. Use when the user says "add to the tree/canvas", "branch off X", "focus on Y", "new topic X", "close / finish the X topic", "tidy the tree", "where was I", "what was I doing", "I lost my place", or otherwise wants to capture / navigate the shape of an ongoing investigation.
+description: Maintain a persistent visual work tree in an Obsidian Canvas as you (and the agents you're driving) branch into sub-problems, decisions, and dead ends across sessions. Resolves which canvas to use per project, tracks a small active set (1–3 nodes you're working on now — the 👉 primary is the attach anchor), and keeps the layout tidy. Use when the user says "add to the tree/canvas", "branch off X", "focus on Y", "also working on Z", "mark X active", "done with X", "new topic X", "close / finish the X topic", "tidy the tree", "where was I", "what was I doing", "I lost my place", or otherwise wants to capture / navigate the shape of an ongoing investigation.
 ---
 
 # work-tree-canvas
@@ -13,14 +13,14 @@ Built on top of the JSON Canvas 1.0 format used by [`kepano/obsidian-skills/json
 
 - **Nodes are units of attention.** Anything you'd otherwise lose between sessions: an open question, a decision you punted on, an insight that came up while debugging something else.
 - **Edges are "because of".** A child exists because the parent led you there. Direction matters — fromNode is the cause / context, toNode is the spawned branch.
-- **Exactly one node is 🎯 the current focus.** That's "where I'm thinking from right now". New nodes attach there by default.
-- **`add` does not move focus.** Focus only moves when the user says so. This is what lets you branch sideways without descending forever.
+- **A small *active set* — 1–3 nodes — is what you're working on right now.** They're colored a bright electric cyan (`#18E0FF`, 🎯) so the live edge of the work pops out of the tree. Exactly one of them is the **primary focus**, marked loud with a leading 👉; that's "where I'm thinking from right now" and where new nodes attach by default. The other 0–2 are parallel threads you're juggling (e.g. while driving several agents).
+- **`add` does not change the active set.** It always attaches to the 👉 primary. The active set only changes when the user says so — *mark* a node active, *unmark* one, or *promote* a new primary. This is what lets you branch sideways without descending forever.
 - **Groups are containers, not units of attention.** A group is a labeled rectangle that wraps a whole branch into one logical topic bucket (e.g. "Auth Server setup"). It carries a lightweight lifecycle of its own (color + emoji: 📌 active → ⏳ in progress → ⛔ blocked → ✅ done) but takes no edges — it just corrals the nodes whose boxes fall inside its rectangle. See the [Groups](#groups) section.
 - **Doneness flows through the tree.** A *container* — a group, or any node that has children — is "done" only when everything inside it is settled (🟢 resolved or 💡 insight). That single rule runs **down** (you can't close a container over open work) and **up** (finishing the last open child offers to close its parents). See [Doneness & propagation](#doneness--propagation).
 
 ## Color & emoji taxonomy
 
-There MUST be exactly one node with color `"5"` (current focus). Refocusing moves the marker; never duplicates it.
+The **active set** is 1–3 nodes carrying the bright **active color `#18E0FF`** (a literal hex, *not* a numbered preset — that's what makes it louder than everything else on the canvas). They're the things you're working on right now. Exactly one of them is the **primary focus**: its title line leads with a loud 👉 (`👉 🎯 …`), and that's the attach anchor for `add`. The other active nodes are plain `🎯` (no arrow). Marking / unmarking a node and promoting a new primary move these markers — the active color appears on 1–3 nodes, the 👉 on exactly one of them, never more.
 
 | Preset | Color  | Emoji | Meaning             | When to use |
 |--------|--------|-------|---------------------|-------------|
@@ -28,12 +28,14 @@ There MUST be exactly one node with color `"5"` (current focus). Refocusing move
 | `"2"`  | orange | 💡    | insight / idea      | Worth keeping, doesn't need immediate action |
 | `"3"`  | yellow | ❓    | open question       | Default for a new branch; the most common kind |
 | `"4"`  | green  | 🟢    | resolved            | Closed out — answered, fixed, or decided |
-| `"5"`  | cyan   | 🎯    | current focus       | Exactly one node at a time |
 | `"6"`  | purple | 🤔    | decision point      | A fork in the road; usually has multiple children |
+| `#18E0FF` | electric cyan | 🎯 | active / working now | The active set: 1–3 nodes at a time; the primary leads with 👉 |
 
-Groups have their own lightweight lifecycle — also color + emoji — described in the [Groups](#groups) section. Groups never use `"5"`: focus is always a text node.
+The active row is the one color that's a **literal hex, not a preset** — bright electric cyan so live work jumps out. (Preset `"5"`, the muted built-in cyan, is consequently unused by this taxonomy; legacy canvases that still have a `"5"` focus node are migrated on read — see [Self-healing](#self-healing-on-read).)
 
-**Open vs settled.** For doneness these six split in two: **open** nodes (❓ question · 🤔 decision · 🔴 blocker · the active 🎯 focus) keep a container from being done; **settled** nodes (🟢 resolved · 💡 insight) don't. An 💡 insight may be promoted to 🟢 once you act on it — either way it stays non-blocking. See [Doneness & propagation](#doneness--propagation).
+Groups have their own lightweight lifecycle — also color + emoji — described in the [Groups](#groups) section. Groups never use the active color `#18E0FF`: active nodes are always text nodes.
+
+**Open vs settled.** For doneness these split in two: **open** nodes (❓ question · 🤔 decision · 🔴 blocker · any active 🎯 node) keep a container from being done; **settled** nodes (🟢 resolved · 💡 insight) don't. An 💡 insight may be promoted to 🟢 once you act on it — either way it stays non-blocking. See [Doneness & propagation](#doneness--propagation).
 
 ## Node text format
 
@@ -85,9 +87,9 @@ JSON Canvas groups have **no member list**. A node belongs to a group purely bec
 - `type`: `"group"`.
 - `label`: the lifecycle emoji + the topic name, e.g. `⏳ Auth Server setup` (no timestamp). Groups have no `text` field, so the emoji lives on the `label`.
 - `x` / `y` / `width` / `height`: the enclosing rectangle (see the fit rule).
-- `color`: a preset reflecting the group's lifecycle state (table below). Never `"5"`.
+- `color`: a preset reflecting the group's lifecycle state (table below). Never the active color `#18E0FF`.
 
-Groups take no edges and are excluded from the one-focus invariant. Unlike the focus marker, any number of groups may share the same lifecycle color.
+Groups take no edges and are excluded from the active-set invariant. Unlike the active color, any number of groups may share the same lifecycle color.
 
 ### Group lifecycle (color + emoji)
 
@@ -115,11 +117,11 @@ The group emoji set (📌 ⏳ ⛔ ✅) is deliberately distinct from the node em
 
 Users talk about **topics**, not "group nodes". A topic *is* a group (a topic bucket). Two phrasings carry structural intent the skill MUST honor over its own sense of how things relate:
 
-- **"new topic X" / "X as a separate / independent / standalone topic" / "it can live on its own".** Create X as a new **top-level branch off the root** — parent = the root node, NOT the current focus and NOT whatever node you were just discussing, *even when X is obviously related to recent work*. Explicit independence beats inferred relatedness. Start it as a single ungrouped node (per "Start ungrouped"); offer to wrap it in a group once its subtree grows. If the relationship to existing work is worth recording, add one **labeled cross-link** edge from the related node, labeled with the *actual* relationship (`shares root cause with`, `supersedes`; `related to` only as a last resort) — but the structural parent stays the root. The structural root→topic edge itself stays **bare**: it's a plain branch, so labeling it `new topic` is exactly the filler to avoid (see [Edge labels](#edge-labels)). Never make a node a descendant of the related node when the user asked for a new/independent topic.
+- **"new topic X" / "X as a separate / independent / standalone topic" / "it can live on its own".** Create X as a new **top-level branch off the root** — parent = the root node, NOT an active node and NOT whatever node you were just discussing, *even when X is obviously related to recent work*. Explicit independence beats inferred relatedness. Start it as a single ungrouped node (per "Start ungrouped"); offer to wrap it in a group once its subtree grows. If the relationship to existing work is worth recording, add one **labeled cross-link** edge from the related node, labeled with the *actual* relationship (`shares root cause with`, `supersedes`; `related to` only as a last resort) — but the structural parent stays the root. The structural root→topic edge itself stays **bare**: it's a plain branch, so labeling it `new topic` is exactly the filler to avoid (see [Edge labels](#edge-labels)). Never make a node a descendant of the related node when the user asked for a new/independent topic.
 
 - **"closing / closed topic X" / "X topic is done" / "finished the X topic".** This is a **group action on X**, not a new node dangling outside it. Resolve X to a group (fuzzy-match the topic name against group labels; if the user named a node instead, take the group enclosing it), then:
   1. **All in-group nodes already settled (🟢 or 💡)** → mark the group ✅ done (group-lifecycle `update`). If the user handed you a concrete result (a configured hostname, a merged PR), you MAY add one closing node *inside* the group — as a child of the relevant in-group node, so the fit rule grows the rect to include it. A closing node never lands outside the group rect.
-  2. **Group still has open nodes inside** (❓ / 🔴 / 🤔, or the 🎯 focus) → apply the [done-down guard](#doneness--propagation): **push back**, name them (`k/n settled`), and ask whether to (a) resolve them, (b) move them out of the group, or (c) mark it ✅ done anyway. Don't silently spawn a node somewhere else on the canvas.
+  2. **Group still has open nodes inside** (❓ / 🔴 / 🤔, or an active 🎯 node) → apply the [done-down guard](#doneness--propagation): **push back**, name them (`k/n settled`), and ask whether to (a) resolve them, (b) move them out of the group, or (c) mark it ✅ done anyway. Don't silently spawn a node somewhere else on the canvas.
   3. **No group matches, but the name resolves to an ungrouped branch** (a child-of-root node + its descendants) → the topic was never wrapped. Mark that branch's head node 🟢 resolved (and any open descendants the user means), and offer to `group` the branch so it reads as a closed topic bucket. Add any closing node as a child within that branch.
   4. **Nothing matches the named topic at all** → ASK which topic they mean (list group labels and depth-1 branch heads), or offer to treat it as a plain node `add`.
 
@@ -143,7 +145,7 @@ The whole model is one idea: **a container is done only when its contents are se
 
 **Open vs settled.** Open nodes keep a container from being done; settled ones don't.
 
-- **Open:** ❓ open question · 🤔 decision · 🔴 blocker · the active 🎯 focus.
+- **Open:** ❓ open question · 🤔 decision · 🔴 blocker · any active 🎯 node.
 - **Settled:** 🟢 resolved · 💡 insight. An 💡 insight may be promoted to 🟢 when acted on / folded in — both are non-blocking, so "settled = 🟢 or 💡" either way.
 
 **Down — the guard (hard).** Never mark a container done while it holds open nodes. If asked to, **block**: name the open ones (`k/n settled`, list them) and offer to (a) resolve them, (b) move them out of the container, or (c) override with an explicit *"do it anyway."* A deliberate override is respected — `show` later flags the result, but the skill never re-nags. This is the only place "done" is enforced.
@@ -152,7 +154,7 @@ The whole model is one idea: **a container is done only when its contents are se
 
 - a 🤔 decision or 🔴 blocker ancestor — present it as an explicit *"ready to decide / unblock?"* step, never rolled past; on yes, flip it 🟢 and keep climbing;
 - the first ancestor that still has an open child; or
-- the 🎯 focus — resolving the focus is a focus move, so ASK where focus goes instead of demoting it silently.
+- an active 🎯 node — resolving something you're actively working on is a focus move (unmark it, or re-promote the 👉), so ASK what should happen to the active set instead of demoting it silently.
 
 A group that becomes all-settled folds into the same offer — this is the group's **auto-done hint**.
 
@@ -190,11 +192,11 @@ Use the absolute path so the vault is implicit.
 When creating a fresh canvas, write a single root node:
 - `id`: fresh 16-hex-char lowercase
 - `type`: `"text"`
-- `text`: `"🎯 <repo-basename>\n<YYYY-MM-DD HH:MM>\nroot"`
-- `color`: `"5"` (current focus)
+- `text`: `"👉 🎯 <repo-basename>\n<YYYY-MM-DD HH:MM>\nroot"`
+- `color`: `"#18E0FF"` (the active color)
 - `x`: 0, `y`: 0, `width`: 320, `height`: 120
 
-The root starts as the focus. The user can move focus later.
+The root starts as the sole active node and the primary focus (it carries the 👉). The user can mark others active, or move the 👉, later.
 
 ## Operations
 
@@ -205,10 +207,10 @@ Map natural-language intent to one of these. Always: read the canvas → mutate 
 Input: a title; optional explicit parent; optional status (emoji or color).
 
 1. Resolve the parent:
-   - **New/independent topic?** If the user framed this as a "new topic" or said it's separate / independent / standalone / "can live on its own", set the parent to the **root** — not the focus, not the last-discussed node. See ["Topic" means group](#topic-means-group--map-the-words-to-the-ops). (And if the phrasing was instead "*closing* a topic", this isn't an `add` at all — route to the group-close flow there.)
+   - **New/independent topic?** If the user framed this as a "new topic" or said it's separate / independent / standalone / "can live on its own", set the parent to the **root** — not an active node, not the last-discussed node. See ["Topic" means group](#topic-means-group--map-the-words-to-the-ops). (And if the phrasing was instead "*closing* a topic", this isn't an `add` at all — route to the group-close flow there.)
    - If the user named one ("under the auth one"), fuzzy-match against existing node titles. If exactly one matches, use it. If zero or multiple match, ASK with a list.
-   - Otherwise, find the current focus (the unique color `"5"` node). If found, use it.
-   - If there's no focus AND no parent named, ASK the user to pick a parent from a list of ≤ 6 candidates (top-level nodes + recent additions).
+   - Otherwise, attach to the **primary focus** — the active node carrying the 👉 (among the 1–3 nodes colored `#18E0FF`, the one whose text leads with 👉). If found, use it.
+   - If there's no active node AND no parent named, ASK the user to pick a parent from a list of ≤ 6 candidates (top-level nodes + recent additions).
 2. Build the new node:
    - 16-hex-char `id`, lowercase, not colliding with any existing node OR edge id.
    - `text` per the format above. Default status: `❓` / color `"3"` (open question).
@@ -219,18 +221,29 @@ Input: a title; optional explicit parent; optional status (emoji or color).
    - `fromNode`: parent.id, `toNode`: newNode.id
    - `fromSide`: `"bottom"`, `toSide`: `"top"`, `toEnd`: `"arrow"`
    - `label`: omit by default — see [Edge labels](#edge-labels). Add one only when it names a real relationship the arrow doesn't already imply (`blocks`, `decides between`, `depends on`). Never the command intent (`new topic`, `branch off`) and never a restatement of the default (`because`, `leads to`).
-5. Do NOT move the focus marker. Only `focus` does that.
+5. Do NOT change the active set or move the 👉. Only `focus` (mark / unmark / promote) does that.
 6. **Open node into a done container?** If the parent (or its enclosing group) is already done and this new node is open, don't let open work sit silently inside it — surface the [move-out-or-reopen call](#doneness--propagation).
 7. Report: `Added "{emoji} {title}" under "{parent emoji} {parent title}".`
 
-### `focus` — move the 🎯 marker
+### `focus` — manage the active set (mark / unmark / promote the 👉)
 
-Input: target node (fuzzy match on title).
+The active set is 1–3 nodes colored `#18E0FF` / 🎯; exactly one carries the leading 👉 (the primary, the attach anchor). This op covers every change to that set. Disambiguate the target node as in `add`. The set is never empty and never has two 👉 — enforce both here.
 
-1. Disambiguate as in `add`.
-2. Old focus: strip the leading `🎯 ` from its first line, prepend the emoji matching its semantic state. Default: if it has children → `🟢` / color `"4"` (resolved). Otherwise → `❓` / color `"3"`. ASK if the user might want something else (e.g. blocker). If the old focus becomes 🟢 and that settles all of its parent's children, run the [done-up cascade](#doneness--propagation).
-3. New focus: set color `"5"`. Replace the leading emoji on its first line with `🎯 `.
-4. Report: `Refocused 🎯 to "{title}" (was "{old title}", marked {emoji}).`
+**Promote / refocus** — "focus on X", "I'm working on X now", "make X primary", "switch focus to X":
+1. If another node holds the 👉, strip its `👉 ` prefix — it *stays* in the active set as a plain `🎯` (still live, just no longer the attach anchor).
+2. Make X active if it isn't already: set `color` to `#18E0FF` and replace its leading emoji with `🎯`. Then prepend `👉 ` to its first line.
+3. If marking X newly active would push the set past 3, ASK which existing active node to unmark first.
+4. Report: `Refocused 👉 to "{title}" ({N} active).`
+
+**Mark active** — "also working on Y", "add Y to the active set", "Y is live too":
+1. Set Y `color` to `#18E0FF`, replace its leading emoji with `🎯` (no 👉 — the primary is unchanged).
+2. If this would make the active set exceed 3, ASK which active node to unmark first.
+3. Report: `Marked "{title}" 🎯 active ({N} active; primary unchanged).`
+
+**Unmark** — "done working on Z", "drop Z from active", "Z isn't live anymore":
+1. Strip any `👉 ` and replace the `🎯` with Z's real semantic emoji, setting `color` to match. Default: has children → `🟢` / `"4"` (resolved); else → `❓` / `"3"`. ASK if it might be something else (e.g. 🔴 blocker). If Z becomes 🟢 and that settles all of its parent's children, run the [done-up cascade](#doneness--propagation).
+2. If Z held the 👉, ASK which remaining active node takes it. If Z was the *last* active node, the set would be empty — ASK which node should become the new primary instead (mirrors the zero-active self-heal); never leave the canvas with no active node.
+3. Report: `Unmarked "{title}" (now {emoji}; {N} active).`
 
 ### `update` — change a node's or group's status
 
@@ -238,7 +251,7 @@ Input: target (node or group) + new status.
 
 1. Disambiguate.
 2. **Text node:** swap the emoji on the first line and set `color` to match the node taxonomy (promoting a 💡 insight to 🟢 is just this). **Group:** swap the lifecycle emoji prefix on the `label` and set `color` to match the group lifecycle.
-3. If the user is changing a node TO 🎯, run `focus` instead (uniqueness).
+3. If the user is changing a node TO 🎯 ("mark active" / "focus on this"), run `focus` instead — it owns the active-set invariants (the `#18E0FF` color, the ≤ 3 limit, the single 👉).
 4. **Set a node to 🟢:** after the swap, run the [done-up cascade](#doneness--propagation) — if it settled all of its parent's children, offer to resolve the parent too, climbing in one prompt.
 5. **Mark a container done** (a node with children, or a group — including "topic X is done / closed / finished", a group action; see ["Topic" means group](#topic-means-group--map-the-words-to-the-ops)): apply the [done-down guard](#doneness--propagation). Mark it done only when every content node is settled; if open nodes remain, push back (`k/n settled`) and offer resolve / move-out / override rather than marking done or spawning an outside node. Add any closing node *inside* the group.
 6. **Reopen a settled node inside a done container:** surface the [move-out-or-reopen call](#doneness--propagation).
@@ -255,7 +268,7 @@ Input: a set of nodes (named, or "this branch" / "the auth branch" = a node and 
 3. Create the group node: fresh 16-hex `id`, `type: "group"`, the `label` prefixed with 📌, and `color: "3"` — i.e. start in the **active** state (see the group lifecycle).
 4. Compute its rectangle via the fit rule around the member set.
 5. If the new rect overlaps an existing group, shift the smaller neighbor group (and its members) clear; ASK if that isn't clean.
-6. Do NOT add edges to/from the group, and do NOT move focus.
+6. Do NOT add edges to/from the group, and do NOT change the active set.
 7. Report: `Grouped {N} nodes into "{label}".`
 
 ### `ungroup` — remove a topic bucket
@@ -273,7 +286,7 @@ Snapshot each group's members (by enclosure) first, run **full tidy** layout (be
 
 Don't try to open the canvas; you can't render it. Instead, report:
 - Canvas path
-- Current focus title
+- The active set: the 👉 primary first, then any other 🎯 active nodes (`N active`)
 - Depth-1 branches (root's direct children) with their child counts
 - Groups (topic buckets) with their state emoji and member counts
 - All **open** nodes — ❓ open questions, 🔴 blockers, 🤔 undecided forks — these are the "loose ends" worth resurfacing
@@ -319,8 +332,11 @@ Edges and node contents are preserved; only x/y (and group rects) change.
 
 Detect and offer to fix these on every read, before any mutation:
 
-- **Zero focus nodes:** ASK which existing node should be focus.
-- **Multiple focus nodes:** ASK which to keep; the others get demoted (default `❓` / color `"3"`).
+- **Legacy focus (`color "5"`):** a node still on the old muted-cyan preset is a pre-change focus. Migrate it to the active color `#18E0FF` and, if nothing else carries the 👉, make it the primary (prepend `👉 `). Report the migration.
+- **Zero active nodes (no `#18E0FF`):** ASK which existing node should be the primary focus, then mark it active with the 👉.
+- **Active node without 👉 and no primary exists:** the set has ≥ 1 active node but none is primary — ASK which active node takes the 👉 (default: the oldest active node).
+- **Multiple 👉 primaries:** ASK which one keeps the 👉; strip the arrow from the rest (they stay active 🎯).
+- **More than 3 active nodes:** the set has grown unwieldy — ASK which ≤ 3 to keep active; the rest get demoted to their real state (default: has children → `🟢` / `"4"`, else `❓` / `"3"`).
 - **Edge with missing `fromNode` or `toNode`:** report orphan edge; ask to delete or rewire.
 - **Cycles:** report cycle path; ask to delete one edge.
 - **Duplicate ids:** regenerate ids in place, keeping the rest of the data; report what changed.
@@ -334,17 +350,17 @@ If the user declines a fix, proceed with the operation but warn that the invaria
 ## Obvious-vs-ask rules for attaching
 
 The skill MUST ask when:
-- There's no current focus AND no parent named.
+- There's no active node AND no parent named.
 - More than one existing node matches the named parent.
 - The user's phrasing is generic ("add this", "log that") with no semantic content the skill can match against.
-- Previous additions in this conversation were ≥ ~3 turns ago without a focus update — context is stale.
+- Previous additions in this conversation were ≥ ~3 turns ago without an active-set update — context is stale.
 
 The skill MAY attach silently when:
-- A unique current focus exists AND the user said something like "add X" / "branch off into Y" / "new question: …" / "while we're here, capture Z".
+- A primary focus (the 👉 node) exists AND the user said something like "add X" / "branch off into Y" / "new question: …" / "while we're here, capture Z".
 - The user explicitly named a parent that disambiguates to exactly one node.
 - The user said "and another one" / "another like that" / "a sibling of that" — attach to the SAME parent as the most recent addition in this conversation.
 
-**Explicit independence overrides inferred relatedness.** If the user calls something a "new topic" or says it's separate / independent / standalone / "can live on its own", attach it to the **root** as a new top-level branch — not to the focus, and not to the related node — *even when the new thing clearly grew out of what you were just discussing.* The agent's sense that "B follows from A" is not a reason to make B a child of A once the user has framed B as independent. Capture the relationship, if it's worth keeping, with a single cross-link edge labeled with the actual relationship (never `new topic` — see [Edge labels](#edge-labels)); the structural parent stays the root. When torn between "child of the related node" and "new top-level branch" and the user used any independence wording, choose top-level.
+**Explicit independence overrides inferred relatedness.** If the user calls something a "new topic" or says it's separate / independent / standalone / "can live on its own", attach it to the **root** as a new top-level branch — not to any active node, and not to the related node — *even when the new thing clearly grew out of what you were just discussing.* The agent's sense that "B follows from A" is not a reason to make B a child of A once the user has framed B as independent. Capture the relationship, if it's worth keeping, with a single cross-link edge labeled with the actual relationship (never `new topic` — see [Edge labels](#edge-labels)); the structural parent stays the root. When torn between "child of the related node" and "new top-level branch" and the user used any independence wording, choose top-level.
 
 When asking, list ≤ 6 candidates as `{depth-indent}{emoji} {title}` and let the user pick by number or by re-typing a fragment.
 
@@ -360,9 +376,9 @@ Per JSON Canvas 1.0 plus this skill's invariants:
 6. `fromEnd` / `toEnd` ∈ {`none`, `arrow`} when present.
 7. `color` is preset `"1"`–`"6"` or a valid `#RRGGBB` hex.
 8. JSON parses cleanly. Single `\n` for newlines in text.
-9. Exactly one text node has color `"5"` (groups never use it).
+9. 1–3 text nodes carry the active color `#18E0FF` (the active set; groups never use it), and **exactly one** of them has a `text` whose first line leads with `👉 ` (the primary focus). Never zero active nodes, never two 👉.
 10. No cycles in the edge graph (unless the user explicitly opted in to a cross-link, in which case the edge gets a `label` naming the relationship so it's visually distinct — see [Edge labels](#edge-labels)).
-11. Group nodes have a `label` (leading lifecycle emoji + topic) and no `text` / `file` / `url`. Their `color` follows the group lifecycle, not the node taxonomy; they're excluded from rules 3 and 9 (never `"5"`). Groups don't overlap each other.
+11. Group nodes have a `label` (leading lifecycle emoji + topic) and no `text` / `file` / `url`. Their `color` follows the group lifecycle, not the node taxonomy; they're excluded from rules 3 and 9 (never the active color `#18E0FF`). Groups don't overlap each other.
 12. Every group encloses ≥ 1 node (an empty group is a self-heal target below, not a hard write-block).
 
 The [done-down guard](#doneness--propagation) is a **mark-time check, not a write invariant**: a deliberate "do it anyway" override (or a later reopen) can leave a done container holding an open node, and that's legal — `show` surfaces it; the write isn't blocked here.
@@ -373,13 +389,16 @@ If a check fails, don't write — explain which invariant would break and ask.
 
 One line per operation. Examples of the shape:
 
-- `Added "❓ JWT vs session for SSO" under "🎯 Auth rewrite".`
+- `Added "❓ JWT vs session for SSO" under "👉 Auth rewrite".`
 - `Added "❓ End-to-end connectivity" as a new top-level topic (independent of the "Get domain for dev-2" group).`
 - `Marked group "Get domain for dev-2" ✅ done and added "🟢 host configured" inside it.`
 - `"Get domain for dev-2": 2/3 settled — ❓ "Needs to be tested" still open. Resolve it, move it out, or mark the group done anyway?`
 - `Resolving "DNS configured" also settles "Get domain for dev-2" — mark the parent and its group ✅ done?`
 - `Added "❓ New regression" into the done group "Auth Server setup" — move it out, or reopen the group?`
-- `Refocused 🎯 to "Decide cache layer" (prior focus "API rewrite" marked 🟢 resolved).`
+- `Refocused 👉 to "Decide cache layer" (2 active; "API rewrite" still 🎯 active).`
+- `Marked "Wire up Stripe webhook" 🎯 active (3 active; primary unchanged).`
+- `Unmarked "API rewrite" (now 🟢 resolved; 1 active).`
+- `Migrated legacy focus "Auth rewrite" to the bright active color and gave it the 👉.`
 - `Marked "JWT vs session for SSO" 🔴 blocker.`
 - `Tidied 14 nodes across 4 depths.`
 - `Grouped 5 nodes into "📌 Auth Server setup".`
