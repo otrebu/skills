@@ -8,7 +8,14 @@ description: 'Delegate one or more coding tasks to background worker `claude` se
 Drive background worker `claude` sessions from this session. Each worker lives in its own tmux pane (private socket) or cmux workspace; you supervise by screen-scraping its TUI. One script, `orchestrate.sh`, backs every step and is mux-agnostic.
 
 ```bash
-ORCH=./skills/orchestrate/orchestrate.sh   # adjust to its real path
+# `orchestrate.sh` ships in THIS skill's directory (next to this SKILL.md). Set
+# ORCH to its absolute path — the directory this SKILL.md was loaded from. This
+# resolves the usual install/repo locations (canonical copy first, repo last):
+ORCH="$(command ls \
+  "$HOME/.agents/skills/orchestrate/orchestrate.sh" \
+  "$HOME/.claude/skills/orchestrate/orchestrate.sh" \
+  "./skills/orchestrate/orchestrate.sh" 2>/dev/null | head -1)"
+[ -x "$ORCH" ] || echo "orchestrate.sh not found — set ORCH to this skill's orchestrate.sh"
 ```
 
 ## SAFETY (read first)
