@@ -43,7 +43,15 @@ Flags:
 
 ## Install locally (when iterating on a skill)
 
-Run from a clone of this repo:
+Run from a clone of this repo.
+
+Install **all** skills (pass the repo root — `skills add` takes one source, so `./skills/*` only installs the first folder):
+
+```bash
+npx -y skills add . -g -a '*' -y
+```
+
+Install **one** skill:
 
 ```bash
 npx -y skills add ./skills/<skill-name> -g -a '*' -y
@@ -54,6 +62,8 @@ Example:
 ```bash
 npx -y skills add ./skills/theory-vs-reality -g -a '*' -y
 ```
+
+PromptScript does not support global (`-g`) installs; you may see a failure line for it even when the other agents succeed.
 
 ## Add a new skill
 
