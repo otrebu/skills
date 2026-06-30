@@ -14,6 +14,7 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 | [`theory-vs-reality`](./skills/theory-vs-reality) | Audits a plan vs the built code by producing an interactive HTML checklist with per-item verdicts pre-filled by parallel subagents. |
 | [`tmp-snapshot`](./skills/tmp-snapshot) | Saves slices of the current conversation to `/tmp/<name>.md` and returns the path plus an outline of every header. |
 | [`topic-to-issue`](./skills/topic-to-issue) | Investigates a topic against the codebase, docs, and web; opens a lean GitHub issue via `gh` only when the work leaves a concrete deferred action. |
+| [`walkthrough`](./skills/walkthrough) | Presents a list — findings, tasks, options, or a file of items — one at a time for focused interactive review, with `next / back / discuss / edit / skip / goto / find / list / done` controls and a running progress header. |
 | [`work-tree-canvas`](./skills/work-tree-canvas) | Maintains a persistent Obsidian Canvas of your work tree across sessions — adds nodes for new branches, tracks the current 🎯 focus, keeps the layout tidy. |
 
 ## Install from GitHub
