@@ -44,7 +44,7 @@ spawn ─▶ send ─▶ wait[background] ─▶ collect(logs) ─▶ act ─▶
 5. **act** on the result (review the diff, run tests, summarize for the user).
 6. **stop** the worker when finished. `"$ORCH" stop fix-auth` (or `stop --all`). `stop` sleeps briefly; run it as a BACKGROUND command.
 
-For a quick non-blocking status check instead of waiting, use `poll`. `poll`, `logs`, and `list` are instant/foreground-safe; `spawn`, `send`, `wait`, and `stop` sleep and should run in the background.
+For a quick non-blocking status check instead of waiting, use `poll`. `poll`, `logs`, `list`, and `attach` are instant/foreground-safe; `spawn`, `send`, `wait`, and `stop` sleep and should run in the background.
 
 ## Reading states
 
@@ -90,9 +90,11 @@ Workers are detached processes; if this orchestrator crashes between `spawn` and
 
 ## tmux vs cmux
 
-`--mux auto` (default) picks **cmux** when its app/socket is reachable (`cmux ping`), else **tmux**. Both expose identical mechanics through the script. tmux workers run on a **private socket** (`-L cc`, override `ORCH_TMUX_SOCK`) so they never collide with the user's own tmux; session names are namespaced per `ORCH_HOME` so two orchestrators on the same socket can't clobber each other. cmux workers are real workspaces in the cmux GUI, so the user can watch/intervene; surface their `workspace:N` ref (from `list`) if the user wants to look.
+`--mux auto` (default) picks **cmux** when its app/socket is reachable (`cmux ping`), else **tmux**. Both expose identical mechanics through the script. tmux workers run on a **private socket** (`-L cc`, override `ORCH_TMUX_SOCK`) so they never collide with the user's own tmux; session names are namespaced per `ORCH_HOME` so two orchestrators on the same socket can't clobber each other. cmux workers are real workspaces in the cmux GUI, so the user can watch/intervene there directly.
 
 **ids are unique only within one `ORCH_HOME`.** If two people/agents share the same `ORCH_TMUX_SOCK`, the per-`ORCH_HOME` namespacing keeps `stop --all`/`gc` from touching each other's workers; to be fully independent, give each its own `ORCH_TMUX_SOCK`.
+
+**Control plane vs view plane.** tmux is the control plane — `spawn`/`send`/`poll`/`wait`/`stop` script every tmux worker directly. cmux is an on-demand view plane: `attach <id>` opens a new cmux pane running **read-only** `tmux attach -r`, which can never type into, interrupt, or kill the worker, and supports any number of concurrent viewers. Viewer workspaces aren't tracked in `ORCH_HOME`, so close them yourself — `gc`/`stop` won't. If cmux isn't reachable it prints the `tmux -L <sock> attach -r -t <session>` command to run yourself; for a cmux-backed (GUI-owned) worker, `attach` just focuses its workspace instead.
 
 ## Tuning (env vars)
 

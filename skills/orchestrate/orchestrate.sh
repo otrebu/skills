@@ -2,7 +2,7 @@
 # orchestrate.sh — drive one or more worker `claude` sessions inside tmux or cmux.
 # Mux-agnostic: a single dispatch layer (mux_*) backs every subcommand.
 #
-# Subcommands: spawn | send | poll | wait | logs | list | stop | gc  (run with none for help)
+# Subcommands: spawn | send | poll | wait | logs | attach | list | stop | gc  (run with none for help)
 #
 # State lives under $ORCH_HOME/<id>.meta — KEY=VALUE lines:
 #   MUX=tmux|cmux  TARGET=<session-or-workspace ref>  DIR=<path>  CREATED=<epoch>
@@ -152,6 +152,12 @@ tmux_spawn() { # <id> <dir> <cmd> -> prints TARGET ref (session:0.0)
   local s; s="$(tmux_sname "$1")"
   tx new-session -d -s "$s" -x 220 -y 50 -c "$2" "$3" \
     || die "tmux: could not create session '$s' (already exists? run: orchestrate gc)"
+  # Lock geometry at the session, not just inside tmux_attach: tmux's default
+  # window-size=latest lets ANY attaching client (incl. the raw `tmux attach -r`
+  # command printed as the manual fallback) resize the worker's live pane, and
+  # the resize persists after that client detaches. `manual` pins it to the
+  # -x/-y above for every future attach, read-only or not.
+  tx set-option -t "$s" window-size manual 2>/dev/null || true
   echo "$s:0.0"
 }
 tmux_send_text()  { tx send-keys -t "$1" -l -- "$2"; }         # literal text, NO Enter; -- guards dash-leading prompts
@@ -163,6 +169,28 @@ tmux_send_key()   { tx send-keys -t "$1" "$2"; }               # named key: Ente
 tmux_capture()    { if [ -n "${2:-}" ]; then tx capture-pane -t "$1" -p -S "-$2"; else tx capture-pane -t "$1" -p; fi; }
 tmux_kill()       { tx kill-session -t "${1%%:*}" 2>/dev/null || true; }
 tmux_alive()      { tx has-session -t "${1%%:*}" 2>/dev/null; }
+
+# tmux is the CONTROL plane; cmux doubles as an on-demand VIEW plane. A tmux
+# session is a shared object, so a read-only attach renders the SAME live
+# session inside a cmux pane instead of opening a second control path.
+tmux_attach() { # <target> <id> <dir> -> open/print a read-only viewer
+  local session="${1%%:*}" id="$2" dir="$3"   # strip ":0.0" — same trick as tmux_kill/tmux_alive
+  # -r = read-only: the viewer can never type into, interrupt, or kill the
+  # worker; closing/detaching it leaves the worker running. Any number of
+  # viewers may attach at once. (Future: --writable could drop -r for an
+  # interactive takeover attach — not implemented.)
+  local cmd="tmux -L $TMUX_SOCK attach -r -t $session"
+  if have cmux && cmux ping >/dev/null 2>&1; then
+    if CMUX_QUIET=1 cmux new-workspace --name "view-$id" --cwd "$dir" --command "$cmd" >/dev/null 2>&1; then
+      log "opened a read-only viewer for '$id' in a new cmux workspace (closing it will NOT stop '$id')"
+      return
+    fi
+    log "cmux: could not open a viewer workspace; run this yourself instead:"
+  else
+    log "cmux not reachable; view '$id' yourself with:"
+  fi
+  log "  $cmd"
+}
 
 # --- cmux backend (refs look like "workspace:6"; CMUX_QUIET silences alias notices) ---
 cmux_spawn() { # <id> <dir> <cmd> -> prints workspace ref
@@ -194,6 +222,12 @@ cmux_kill()       { CMUX_QUIET=1 cmux close-workspace --workspace "$1" >/dev/nul
 # Aliveness = EXISTENCE (list-workspaces), not terminal readability. read-screen
 # can fail transiently on a live workspace whose terminal hasn't rendered.
 cmux_alive()      { CMUX_QUIET=1 cmux list-workspaces 2>/dev/null | grep -qE "(^|[[:space:]])$1([[:space:]]|$)"; }
+# GUI-owned workspace — no tmux session underneath, so no read-only view exists.
+# Best-effort focus, then leave the user with an actionable next step either way.
+cmux_attach()     { # <target> <id> <dir> -> focus the workspace; <dir> unused (cmux is already open)
+  CMUX_QUIET=1 cmux select-workspace --workspace "$1" >/dev/null 2>&1 || true
+  log "'$2' is a cmux-GUI worker (workspace $1); switch to it in the cmux app — orchestrate cannot open a separate view for a cmux-backed worker"
+}
 
 # Dispatch wrappers — pick backend by $MUX.
 mux_send_text()  { "${MUX}_send_text"  "$TARGET" "$1"; }
@@ -202,6 +236,7 @@ mux_send_key()   { "${MUX}_send_key"   "$TARGET" "$1"; }
 mux_capture()    { "${MUX}_capture"    "$TARGET" "${1:-}"; }
 mux_kill()       { "${MUX}_kill"       "$TARGET"; }
 mux_alive()      { "${MUX}_alive"      "$TARGET"; }
+mux_attach()     { "${MUX}_attach"     "$TARGET" "$1" "$2"; }
 
 # ─── Shared helpers ──────────────────────────────────────────────────────────
 
@@ -435,6 +470,13 @@ cmd_logs() {
   mux_capture "$lines" | strip_ansi
 }
 
+cmd_attach() {
+  local id="${1:-}"; [ -n "$id" ] || die "attach: need an <id>"
+  require_meta "$id"
+  mux_alive || die "attach: worker '$id' is gone"
+  mux_attach "$id" "$DIR"
+}
+
 cmd_list() {
   mkdir -p "$ORCH_HOME"
   printf '%-16s %-6s %-22s %-12s %s\n' ID MUX TARGET STATE DIR
@@ -503,6 +545,11 @@ orchestrate.sh — drive worker \`claude\` sessions in tmux or cmux.
         RUN AS A BACKGROUND COMMAND — it sleeps internally. idle-cycles min 2.
   logs  <id> [--lines <n>]
         Full capture incl. scrollback (default 2000 lines). Instant.
+  attach <id>
+        Open a LIVE READ-ONLY view (never disrupts/kills the worker). tmux
+        worker: opens a new cmux pane running \`tmux attach -r\`; if cmux is
+        unreachable, prints that command for you to run yourself. cmux worker:
+        focuses its workspace (GUI-owned, no read-only view exists).
   list  Table of workers + current state. Instant.
   stop  <id> | stop --all
         Interrupt, close the session/workspace, remove meta. Sleeps briefly.
@@ -517,14 +564,15 @@ EOF
 main() {
   local sub="${1:-}"; [ $# -gt 0 ] && shift || true
   case "$sub" in
-    spawn) cmd_spawn "$@" ;;
-    send)  cmd_send  "$@" ;;
-    poll)  cmd_poll  "$@" ;;
-    wait)  cmd_wait  "$@" ;;
-    logs)  cmd_logs  "$@" ;;
-    list)  cmd_list  "$@" ;;
-    stop)  cmd_stop  "$@" ;;
-    gc)    cmd_gc    "$@" ;;
+    spawn)  cmd_spawn  "$@" ;;
+    send)   cmd_send   "$@" ;;
+    poll)   cmd_poll   "$@" ;;
+    wait)   cmd_wait   "$@" ;;
+    logs)   cmd_logs   "$@" ;;
+    attach) cmd_attach "$@" ;;
+    list)   cmd_list   "$@" ;;
+    stop)   cmd_stop   "$@" ;;
+    gc)     cmd_gc     "$@" ;;
     ""|-h|--help|help) usage ;;
     *) die "unknown subcommand '$sub' (try: orchestrate help)" ;;
   esac
