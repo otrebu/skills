@@ -2,7 +2,8 @@
 # orchestrate.sh — drive one or more worker `claude` sessions inside tmux or cmux.
 # Mux-agnostic: a single dispatch layer (mux_*) backs every subcommand.
 #
-# Subcommands: spawn | send | poll | wait | logs | attach | list | stop | gc  (run with none for help)
+# Subcommands: spawn | send | run | poll | wait | waitall | logs | attach | list | stop | gc
+# (run with none for help). run = send+wait fused; waitall = one loop over a fleet.
 #
 # State lives under $ORCH_HOME/<id>.meta — KEY=VALUE lines:
 #   MUX=tmux|cmux  TARGET=<session-or-workspace ref>  DIR=<path>  CREATED=<epoch>
@@ -147,7 +148,7 @@ TMUX_SOCK="${ORCH_TMUX_SOCK:-cc}"
 tx() { command tmux -L "$TMUX_SOCK" "$@"; }
 tmux_sname() { echo "orch_$(orch_tag)_$1"; }   # namespaced session name
 
-tmux_spawn() { # <id> <dir> <cmd> -> prints TARGET ref (session:0.0)
+tmux_spawn() { # <id> <dir> <cmd> -> prints TARGET ref (session:win.pane)
   have tmux || die "tmux not found"
   local s; s="$(tmux_sname "$1")"
   tx new-session -d -s "$s" -x 220 -y 50 -c "$2" "$3" \
@@ -158,7 +159,15 @@ tmux_spawn() { # <id> <dir> <cmd> -> prints TARGET ref (session:0.0)
   # the resize persists after that client detaches. `manual` pins it to the
   # -x/-y above for every future attach, read-only or not.
   tx set-option -t "$s" window-size manual 2>/dev/null || true
-  echo "$s:0.0"
+  # NEVER assume the pane is :0.0 — ~/.tmux.conf is sourced at server start
+  # even on this private -L socket, so `base-index 1`/`pane-base-index 1` there
+  # shifts the indices and every later `tx -t` lookup would fail ("can't find
+  # window: 0"), killing spawn before boot confirms (github issue #2). Ask tmux
+  # what it actually created instead.
+  local w p
+  w="$(tx list-windows -t "$s" -F '#I' | head -1)"
+  p="$(tx list-panes  -t "$s:${w:-0}" -F '#P' | head -1)"
+  echo "$s:${w:-0}.${p:-0}"
 }
 tmux_send_text()  { tx send-keys -t "$1" -l -- "$2"; }         # literal text, NO Enter; -- guards dash-leading prompts
 tmux_send_paste() { # <target> <file> — bracketed paste so newlines don't submit early
@@ -174,7 +183,7 @@ tmux_alive()      { tx has-session -t "${1%%:*}" 2>/dev/null; }
 # session is a shared object, so a read-only attach renders the SAME live
 # session inside a cmux pane instead of opening a second control path.
 tmux_attach() { # <target> <id> <dir> -> open/print a read-only viewer
-  local session="${1%%:*}" id="$2" dir="$3"   # strip ":0.0" — same trick as tmux_kill/tmux_alive
+  local session="${1%%:*}" id="$2" dir="$3"   # strip ":<w>.<p>" at the FIRST colon — same trick as tmux_kill/tmux_alive
   # -r = read-only: the viewer can never type into, interrupt, or kill the
   # worker; closing/detaching it leaves the worker running. Any number of
   # viewers may attach at once. (Future: --writable could drop -r for an
@@ -276,6 +285,9 @@ cmd_spawn() {
   local id="" dir="$PWD" mux="auto" flags="" allow_shared=0
   [ $# -ge 1 ] && { id="$1"; shift; }
   [ -n "$id" ] || die "spawn: need an <id>"
+  # ids name tmux sessions (no '.'/':' allowed) and key waitall's <id>=<STATE>
+  # output lines (no '='), so keep them boring.
+  case "$id" in *[!A-Za-z0-9_-]*) die "spawn: id must be alphanumeric/_/- only" ;; esac
   while [ $# -gt 0 ]; do
     case "$1" in
       --dir)              dir="$2"; shift 2 ;;
@@ -334,26 +346,22 @@ cmd_spawn() {
   echo "$id"
 }
 
-cmd_send() {
-  local id="" file="" enter_delay="0.5" inline="" got_inline=0
-  [ $# -ge 1 ] && { id="$1"; shift; }
-  [ -n "$id" ] || die "send: need an <id>"
-  while [ $# -gt 0 ]; do
-    case "$1" in
-      --file)        file="$2"; shift 2 ;;
-      --enter-delay) need_num "send: --enter-delay" "$2"; enter_delay="$2"; shift 2 ;;
-      --) shift; inline="$*"; got_inline=1; break ;;
-      *) die "send: unknown arg '$1' (use --file, -- <text>, or stdin)" ;;
-    esac
-  done
-  require_meta "$id"
+# Prompt delivery shared by send/run. Caller must have run require_meta.
+deliver_prompt() { # <id> <file> <inline> <got_inline> <enter_delay> <answer>
+  local id="$1" file="$2" inline="$3" got_inline="$4" enter_delay="$5" answer="$6"
   mux_alive || die "send: worker '$id' is gone"
 
   # Refuse to send into a live human-decision dialog (would silently cancel it).
-  local probe
-  probe="$(mux_capture 60 | strip_ansi)" || probe=""
-  if printf '%s' "$probe" | grep -qE "$DIALOG_RE" && ! printf '%s' "$probe" | grep -qE "$TRUST_RE"; then
-    die "send: worker '$id' is at a human-decision dialog (NEEDS_INPUT). Surface it to the user; do not auto-answer."
+  # --answer is the ONLY way past this guard, and it asserts a HUMAN made the
+  # decision being delivered — the dialog (or the >>> NEEDS_HUMAN: sentinel)
+  # stays on screen after it is surfaced, so the guard would otherwise also
+  # block the legitimate reply. Never pass --answer on the agent's own call.
+  if [ "$answer" -ne 1 ]; then
+    local probe
+    probe="$(mux_capture 60 | strip_ansi)" || probe=""
+    if printf '%s' "$probe" | grep -qE "$DIALOG_RE" && ! printf '%s' "$probe" | grep -qE "$TRUST_RE"; then
+      die "send: worker '$id' is at a human-decision dialog (NEEDS_INPUT). Surface it to the user; deliver THEIR decision with --answer. Do not auto-answer."
+    fi
   fi
 
   # Resolve prompt source into a temp file (uniform path for single/multi line).
@@ -390,69 +398,229 @@ cmd_send() {
   log "sent ${nbytes} bytes to '$id'"
 }
 
+cmd_send() {
+  local id="" file="" enter_delay="0.5" inline="" got_inline=0 answer=0
+  [ $# -ge 1 ] && { id="$1"; shift; }
+  [ -n "$id" ] || die "send: need an <id>"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --file)        file="$2"; shift 2 ;;
+      --enter-delay) need_num "send: --enter-delay" "$2"; enter_delay="$2"; shift 2 ;;
+      --answer)      answer=1; shift ;;
+      --) shift; inline="$*"; got_inline=1; break ;;
+      *) die "send: unknown arg '$1' (use --file, -- <text>, or stdin)" ;;
+    esac
+  done
+  require_meta "$id"
+  deliver_prompt "$id" "$file" "$inline" "$got_inline" "$enter_delay" "$answer"
+}
+
+# send+wait fused — the loop primitive. One prompt in, one STATE= line out.
+cmd_run() {
+  local id="" file="" inline="" got_inline=0 enter_delay="0.5" answer=0
+  local timeout=900 idle_cycles=3 interval=3 max_interval=10 show_screen=0
+  [ $# -ge 1 ] && { id="$1"; shift; }
+  [ -n "$id" ] || die "run: need an <id>"
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --file)         file="$2"; shift 2 ;;
+      --enter-delay)  need_num "run: --enter-delay" "$2"; enter_delay="$2"; shift 2 ;;
+      --answer)       answer=1; shift ;;
+      --timeout)      need_int "run: --timeout" "$2"; timeout="$2"; shift 2 ;;
+      --idle-cycles)  need_int "run: --idle-cycles" "$2"; idle_cycles="$2"; shift 2 ;;
+      --interval)     need_int "run: --interval" "$2"; interval="$2"; shift 2 ;;
+      --max-interval) need_int "run: --max-interval" "$2"; max_interval="$2"; shift 2 ;;
+      --screen)       show_screen=1; shift ;;
+      --) shift; inline="$*"; got_inline=1; break ;;
+      *) die "run: unknown arg '$1'" ;;
+    esac
+  done
+  [ "$interval" -ge 1 ] || interval=1   # engine re-clamps the rest
+  require_meta "$id"
+  deliver_prompt "$id" "$file" "$inline" "$got_inline" "$enter_delay" "$answer"
+  # One-interval grace before the first classify: let the submitted turn
+  # visibly start, so a lingering pre-turn idle frame can't seed the settled
+  # window into a false instant DONE.
+  sleep "$interval"
+  wait_engine "$timeout" "$idle_cycles" "$interval" "$max_interval" 0 "$id"
+  report_single "$id" "$show_screen"
+}
+
 cmd_poll() {
   local id="${1:-}"; [ -n "$id" ] || die "poll: need an <id>"
   require_meta "$id"
-  if ! mux_alive; then echo "GONE (worker gone)"; return; fi
+  # single existence probe (instant command) — wait/waitall do the 3-strike confirm
+  if ! mux_alive; then echo "STATE=GONE"; return; fi
   local screen state
-  screen="$(mux_capture 60 | strip_ansi)" || { echo "UNKNOWN (no capture)"; return; }
+  screen="$(mux_capture 60 | strip_ansi)" || { echo "STATE=UNKNOWN"; return; }
   state="$(classify "$screen")"
-  echo "$state"
+  echo "STATE=$state"
   echo "──────── last lines ────────"
   printf '%s\n' "$screen" | { grep -v '^[[:space:]]*$' || true; } | tail -20
 }
 
+# ─── Wait engine (shared by wait / run / waitall) ────────────────────────────
+# Poll 1..N workers until each reaches a terminal state — DONE | NEEDS_INPUT |
+# GONE, or TIMEOUT for whatever is unfinished at the deadline — with ONE sleep
+# per cycle. Detection semantics are the classic, per-worker ones:
+#   DONE  = K consecutive IDLE polls with an UNCHANGED volatility-normalized
+#           tail hash (the first IDLE only arms the window),
+#   GONE  = >=3 consecutive existence-probe failures (a single failed probe or
+#           screen read is a skipped sample, never a verdict),
+#   NEEDS_INPUT = classify() saw a human-decision dialog / sentinel.
+# NEVER kills anything — TIMEOUT means "still alive, just slow".
+#
+# Only the CADENCE adapts: the sleep starts at <interval> and doubles up to
+# <max_interval> while every pending worker stays BUSY/UNKNOWN with no state
+# change; the moment any pending worker classifies IDLE (arming/counting the
+# settled window) or ANY state transition happens, it snaps back to <interval>
+# so DONE fires promptly. The last sleep is clamped so the <timeout> deadline
+# is still checked on time.
+#
+# NOTE: index-parallel arrays, not `declare -A` — /usr/bin/env bash can be 3.2
+# (macOS), where assoc arrays don't exist and `a[$k]` silently coerces every
+# non-numeric key to index 0.
+# Results (parallel to ENG_IDS): ENG_STATE[i] = terminal state, or last live
+# state for targets still pending when --any returned early; ENG_SCREEN[i] =
+# last capture; ENG_NTERM = how many targets went terminal.
+wait_engine() { # <timeout> <idle_cycles> <interval> <max_interval> <any 0|1> <id>...
+  local timeout="$1" idle_k="$2" base_iv="$3" max_iv="$4" any="$5"; shift 5
+  [ "$idle_k" -ge 2 ] || idle_k=2       # the hash guard needs >=2 equal samples to mean anything
+  [ "$base_iv" -ge 1 ] || base_iv=1
+  [ "$max_iv" -ge "$base_iv" ] || max_iv="$base_iv"   # ceiling never below the base
+  ENG_IDS=("$@"); ENG_STATE=(); ENG_SCREEN=(); ENG_NTERM=0
+  local total="$#" i id
+  local -a emux etgt term prevh consec gone prevst
+  for i in "${!ENG_IDS[@]}"; do
+    id="${ENG_IDS[$i]}"
+    require_meta "$id"
+    emux[i]="$MUX"; etgt[i]="$TARGET"
+    ENG_STATE[i]=UNKNOWN; ENG_SCREEN[i]=""
+    term[i]=0; prevh[i]=""; consec[i]=0; gone[i]=0; prevst[i]=""
+  done
+  local start now elapsed left cur="$base_iv" nterm=0 snap transition screen state h
+  start="$(date +%s)"
+  while :; do
+    now="$(date +%s)"; elapsed=$(( now - start ))
+    if [ "$elapsed" -ge "$timeout" ]; then
+      for i in "${!ENG_IDS[@]}"; do
+        [ "${term[$i]}" -eq 1 ] || { ENG_STATE[i]=TIMEOUT; term[i]=1; nterm=$(( nterm + 1 )); }
+      done
+      break
+    fi
+    snap=0; transition=0
+    for i in "${!ENG_IDS[@]}"; do
+      [ "${term[$i]}" -eq 1 ] && continue
+      MUX="${emux[$i]}"; TARGET="${etgt[$i]}"
+      if ! mux_alive; then
+        # first failed probe counts as a transition so the 3-strike GONE
+        # confirmation runs at base cadence, not a backed-off one
+        [ "${prevst[$i]}" = "PROBE_FAIL" ] || transition=1
+        prevst[i]="PROBE_FAIL"
+        gone[i]=$(( gone[i] + 1 ))
+        [ "${gone[$i]}" -ge 3 ] && { ENG_STATE[i]=GONE; term[i]=1; nterm=$(( nterm + 1 )); }
+        continue
+      fi
+      gone[i]=0
+      screen="$(mux_capture 60 | strip_ansi)" || continue   # transient read failure: skip the sample, keep counters
+      ENG_SCREEN[i]="$screen"
+      state="$(classify "$screen")"
+      [ "$state" = "${prevst[$i]}" ] || transition=1
+      prevst[i]="$state"
+      ENG_STATE[i]="$state"
+      h="$(tail_hash "$screen")"
+      case "$state" in
+        NEEDS_INPUT) term[i]=1; nterm=$(( nterm + 1 )) ;;
+        IDLE)
+          snap=1
+          # first IDLE only arms the window; consec advances only on an UNCHANGED hash
+          if [ -n "${prevh[$i]}" ] && [ "$h" = "${prevh[$i]}" ]; then consec[i]=$(( consec[i] + 1 ))
+          else consec[i]=0; fi
+          [ "${consec[$i]}" -ge $(( idle_k - 1 )) ] && { ENG_STATE[i]=DONE; term[i]=1; nterm=$(( nterm + 1 )); }
+          ;;
+        *) consec[i]=0 ;;
+      esac
+      prevh[i]="$h"
+    done
+    ENG_NTERM="$nterm"
+    [ "$nterm" -ge "$total" ] && break
+    [ "$any" -eq 1 ] && [ "$nterm" -ge 1 ] && break
+    # adaptive cadence (see block comment): any change -> base; steady busy -> double
+    if [ "$snap" -eq 1 ] || [ "$transition" -eq 1 ]; then
+      cur="$base_iv"
+    else
+      cur=$(( cur * 2 )); [ "$cur" -gt "$max_iv" ] && cur="$max_iv"
+    fi
+    now="$(date +%s)"; left=$(( timeout - (now - start) ))
+    [ "$cur" -gt "$left" ] && cur="$left"   # never oversleep past --timeout
+    [ "$cur" -ge 1 ] || cur=1
+    sleep "$cur"
+  done
+  ENG_NTERM="$nterm"
+}
+
+# Terminal report for a single-target wait/run. Default: EXACTLY one stdout
+# line "STATE=<x>" (machine-parseable; diagnostics go to stderr). --screen
+# appends the final screen and repeats STATE= as the last line for tail-readers.
+report_single() { # <id> <show_screen 0|1>  (reads ENG_* slot 0)
+  local id="$1"
+  printf 'STATE=%s\n' "${ENG_STATE[0]}"
+  if [ "$2" -eq 1 ]; then
+    echo "──────── final screen ($id) ────────"
+    printf '%s\n' "${ENG_SCREEN[0]}" | { grep -v '^[[:space:]]*$' || true; } | tail -25
+    printf 'STATE=%s\n' "${ENG_STATE[0]}"
+  fi
+}
+
 cmd_wait() {
-  local id="" timeout=900 idle_cycles=3 interval=3
+  local id="" timeout=900 idle_cycles=3 interval=3 max_interval=10 show_screen=0
   [ $# -ge 1 ] && { id="$1"; shift; }
   [ -n "$id" ] || die "wait: need an <id>"
   while [ $# -gt 0 ]; do
     case "$1" in
-      --timeout)     need_int "wait: --timeout" "$2"; timeout="$2"; shift 2 ;;
-      --idle-cycles) need_int "wait: --idle-cycles" "$2"; idle_cycles="$2"; shift 2 ;;
-      --interval)    need_int "wait: --interval" "$2"; interval="$2"; shift 2 ;;
+      --timeout)      need_int "wait: --timeout" "$2"; timeout="$2"; shift 2 ;;
+      --idle-cycles)  need_int "wait: --idle-cycles" "$2"; idle_cycles="$2"; shift 2 ;;
+      --interval)     need_int "wait: --interval" "$2"; interval="$2"; shift 2 ;;
+      --max-interval) need_int "wait: --max-interval" "$2"; max_interval="$2"; shift 2 ;;
+      --screen)       show_screen=1; shift ;;
       *) die "wait: unknown arg '$1'" ;;
     esac
   done
-  require_meta "$id"
-  [ "$idle_cycles" -ge 2 ] || idle_cycles=2   # the hash guard needs >=2 equal samples to mean anything
-  [ "$interval" -ge 1 ] || interval=1
+  wait_engine "$timeout" "$idle_cycles" "$interval" "$max_interval" 0 "$id"
+  report_single "$id" "$show_screen"
+}
 
-  # DONE only after K consecutive IDLE polls AND an unchanged (volatility-
-  # normalized) tail hash across that window. A single failed read => retry as
-  # UNKNOWN; GONE only after several consecutive existence-probe failures.
-  local start now elapsed screen state h prev_h="" consec=0 final="TIMEOUT" lastscreen="" gone=0
-  start="$(date +%s)"
-  while :; do
-    now="$(date +%s)"; elapsed=$(( now - start ))
-    if [ "$elapsed" -ge "$timeout" ]; then final="TIMEOUT"; break; fi
-    if mux_alive; then gone=0; else
-      gone=$(( gone + 1 ))
-      [ "$gone" -ge 3 ] && { final="GONE"; break; }
-      sleep "$interval"; continue
-    fi
-    screen="$(mux_capture 60 | strip_ansi)" || { sleep "$interval"; continue; }
-    lastscreen="$screen"
-    state="$(classify "$screen")"
-    h="$(tail_hash "$screen")"
-    case "$state" in
-      NEEDS_INPUT) final="NEEDS_INPUT"; break ;;
-      IDLE)
-        # first IDLE only arms the window; consec advances only on an UNCHANGED hash
-        if [ -n "$prev_h" ] && [ "$h" = "$prev_h" ]; then consec=$(( consec + 1 ))
-        else consec=0; fi
-        [ "$consec" -ge $(( idle_cycles - 1 )) ] && { final="DONE"; break; }
-        ;;
-      *) consec=0 ;;
+# Batch supervisor: ONE adaptive loop across a fleet. Observe-only — never
+# kills, restarts, or answers anything. Output is implicitly quiet: one
+# "<id>=<STATE>" line per target + a final "BATCH=<terminal>/<total>".
+cmd_waitall() {
+  local any=0 timeout=900 idle_cycles=3 interval=3 max_interval=10
+  local ids=() f id i
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --any)          any=1; shift ;;
+      --timeout)      need_int "waitall: --timeout" "$2"; timeout="$2"; shift 2 ;;
+      --idle-cycles)  need_int "waitall: --idle-cycles" "$2"; idle_cycles="$2"; shift 2 ;;
+      --interval)     need_int "waitall: --interval" "$2"; interval="$2"; shift 2 ;;
+      --max-interval) need_int "waitall: --max-interval" "$2"; max_interval="$2"; shift 2 ;;
+      -*)             die "waitall: unknown arg '$1'" ;;
+      *)              ids+=("$1"); shift ;;
     esac
-    prev_h="$h"
-    sleep "$interval"
   done
-
-  printf 'STATE=%s\n' "$final"          # load-bearing line FIRST so a later pipe can't preempt it
-  echo "──────── final screen ($id) ────────"
-  printf '%s\n' "$lastscreen" | { grep -v '^[[:space:]]*$' || true; } | tail -25
-  echo "STATE=$final"                   # also last, for callers that read the tail
+  if [ "${#ids[@]}" -eq 0 ]; then   # no ids -> every worker with a live meta here
+    mkdir -p "$ORCH_HOME"
+    shopt -s nullglob
+    for f in "$ORCH_HOME"/*.meta; do
+      id="$(basename "$f" .meta)"
+      require_meta "$id" 2>/dev/null || continue
+      ids+=("$id")
+    done
+  fi
+  [ "${#ids[@]}" -gt 0 ] || die "waitall: no workers to wait for (spawn some, or pass ids)"
+  log "waitall: supervising ${#ids[@]} worker(s): ${ids[*]}"
+  wait_engine "$timeout" "$idle_cycles" "$interval" "$max_interval" "$any" "${ids[@]}"
+  for i in "${!ENG_IDS[@]}"; do printf '%s=%s\n' "${ENG_IDS[$i]}" "${ENG_STATE[$i]}"; done
+  printf 'BATCH=%s/%s\n' "$ENG_NTERM" "${#ENG_IDS[@]}"
 }
 
 cmd_logs() {
@@ -531,18 +699,34 @@ usage() {
   cat >&2 <<EOF
 orchestrate.sh — drive worker \`claude\` sessions in tmux or cmux.
 
+Loop commands print machine lines on STDOUT (diagnostics on stderr):
+  run/wait -> one line  STATE=DONE|NEEDS_INPUT|TIMEOUT|GONE
+  waitall  -> one <id>=<STATE> line per target + final BATCH=<terminal>/<total>
+  poll     -> first line STATE=BUSY|IDLE|NEEDS_INPUT|UNKNOWN|GONE
+
   spawn <id> [--dir <path>] [--mux tmux|cmux|auto] [--flags "<extra>"] [--allow-shared-dir]
         Launch \`claude --dangerously-skip-permissions\`, dismiss first-run dialog.
         Sleeps during boot (~40s) — run as a BACKGROUND command. Refuses a --dir
-        already in use by a live worker unless --allow-shared-dir.
-  send  <id> [--file <promptfile> | -- <inline text...>] [--enter-delay <s>]
-        Type a prompt (also reads stdin) and submit it. Refuses if the worker is
-        at a human-decision dialog. Multiline -> one bracketed-paste block + Enter.
+        already in use by a live worker unless --allow-shared-dir. id: [A-Za-z0-9_-]+.
+  run   <id> [--file <f> | -- <text...>] [--answer] [--timeout <s>] [--idle-cycles <k>]
+             [--interval <s>] [--max-interval <s>] [--screen] [--enter-delay <s>]
+        send+wait FUSED: submit the prompt (or stdin), block until the worker
+        settles, print exactly one STATE=<x> line (--screen appends the final
+        screen, repeating STATE= last). The loop primitive. BACKGROUND.
+  send  <id> [--file <promptfile> | -- <inline text...>] [--answer] [--enter-delay <s>]
+        Type a prompt (also reads stdin) and submit it WITHOUT waiting — the
+        fan-out primitive. Refuses into a live human-decision dialog unless
+        --answer (= a HUMAN decided; never pass it on your own initiative).
+        Multiline -> one bracketed-paste block + Enter.
+  wait  <id> [--timeout <s>] [--idle-cycles <k>] [--interval <s>] [--max-interval <s>] [--screen]
+        Block until settled WITHOUT sending (re-arm after TIMEOUT, or follow a
+        bare send). Same one-line STATE=<x> contract as run. BACKGROUND.
+  waitall [<id>...] [--any] [--timeout <s>] [--idle-cycles <k>] [--interval <s>] [--max-interval <s>]
+        Supervise MANY workers in ONE loop (no ids = all in this ORCH_HOME).
+        Default returns when ALL are terminal; --any returns at the FIRST
+        (others report their live state). Observe-only — never kills. BACKGROUND.
   poll  <id>
-        Print BUSY|IDLE|NEEDS_INPUT|UNKNOWN|GONE + last ~20 lines. Instant.
-  wait  <id> [--timeout <s>] [--idle-cycles <k>] [--interval <s>]
-        Block until DONE|NEEDS_INPUT|TIMEOUT|GONE. First AND last line = STATE=<x>.
-        RUN AS A BACKGROUND COMMAND — it sleeps internally. idle-cycles min 2.
+        STATE=<x> + last ~20 lines. Instant, non-blocking.
   logs  <id> [--lines <n>]
         Full capture incl. scrollback (default 2000 lines). Instant.
   attach <id>
@@ -555,6 +739,12 @@ orchestrate.sh — drive worker \`claude\` sessions in tmux or cmux.
         Interrupt, close the session/workspace, remove meta. Sleeps briefly.
   gc    Reap orphaned tmux sessions for THIS ORCH_HOME (run after a crash).
 
+Waiting adapts its cadence: sleeps start at --interval (3s) and double up to
+--max-interval (10s, never below the base) while the screen stays BUSY/UNKNOWN,
+snapping back to base the moment anything changes (esp. IDLE, which arms the
+settled window). DONE still = --idle-cycles (min 2) consecutive IDLE polls with
+an unchanged volatility-normalized tail. NOTHING is ever killed on timeout.
+
 State dir: $ORCH_HOME
 Env: ORCH_HOME, ORCH_TMUX_SOCK, ORCH_ASCII_ONLY, CLASSIFY_TAIL.
 EOF
@@ -564,15 +754,17 @@ EOF
 main() {
   local sub="${1:-}"; [ $# -gt 0 ] && shift || true
   case "$sub" in
-    spawn)  cmd_spawn  "$@" ;;
-    send)   cmd_send   "$@" ;;
-    poll)   cmd_poll   "$@" ;;
-    wait)   cmd_wait   "$@" ;;
-    logs)   cmd_logs   "$@" ;;
-    attach) cmd_attach "$@" ;;
-    list)   cmd_list   "$@" ;;
-    stop)   cmd_stop   "$@" ;;
-    gc)     cmd_gc     "$@" ;;
+    spawn)   cmd_spawn   "$@" ;;
+    send)    cmd_send    "$@" ;;
+    run)     cmd_run     "$@" ;;
+    poll)    cmd_poll    "$@" ;;
+    wait)    cmd_wait    "$@" ;;
+    waitall) cmd_waitall "$@" ;;
+    logs)    cmd_logs    "$@" ;;
+    attach)  cmd_attach  "$@" ;;
+    list)    cmd_list    "$@" ;;
+    stop)    cmd_stop    "$@" ;;
+    gc)      cmd_gc      "$@" ;;
     ""|-h|--help|help) usage ;;
     *) die "unknown subcommand '$sub' (try: orchestrate help)" ;;
   esac
