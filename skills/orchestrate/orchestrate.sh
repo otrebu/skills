@@ -1,81 +1,169 @@
 #!/usr/bin/env bash
-# orchestrate.sh — drive one or more worker `claude` sessions inside tmux or cmux.
-# Mux-agnostic: a single dispatch layer (mux_*) backs every subcommand.
+# orchestrate.sh — drive one or more worker agent-CLI sessions inside tmux or cmux.
+# Mux-agnostic AND agent-agnostic: a single dispatch layer (mux_*) backs every
+# subcommand, and an agent PROFILE (load_profile) supplies the launch command +
+# TUI-detection regexes per worker (claude by default; cursor/codex/gemini/
+# generic built in; any other CLI via a <name>.profile file).
 #
 # Subcommands: spawn | send | run | poll | wait | waitall | logs | attach | list | stop | gc
 # (run with none for help). run = send+wait fused; waitall = one loop over a fleet.
 #
 # State lives under $ORCH_HOME/<id>.meta — KEY=VALUE lines:
-#   MUX=tmux|cmux  TARGET=<session-or-workspace ref>  DIR=<path>  CREATED=<epoch>
+#   MUX=tmux|cmux  TARGET=<session-or-workspace ref>  DIR=<path>  CREATED=<epoch>  AGENT=<profile>
 set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Default state dir lives OUTSIDE any repo so meta files (which contain absolute
 # paths) never get committed/leaked. Override with ORCH_HOME.
 ORCH_HOME="${ORCH_HOME:-${XDG_STATE_HOME:-$HOME/.local/state}/orchestrate}"
 
-# ─── Detection regexes — TUNE HERE ───────────────────────────────────────────
-# Matched (grep -E, POSIX ERE) against an ANSI-stripped TAIL of the worker's
-# screen. Precedence in classify(): DIALOG > BUSY > IDLE > UNKNOWN. BUSY and
-# DIALOG are searched across the WHOLE capture; only IDLE/composer is tail-
-# anchored (a one-frame output burst can push the status line above the tail).
+# ─── Agent profiles — TUNE HERE ──────────────────────────────────────────────
+# orchestrate is agent-agnostic: a PROFILE tells it how to LAUNCH one agent CLI
+# in full-auto mode and how to READ its TUI. All regexes are grep -E (POSIX
+# ERE), matched against the ANSI-stripped VISIBLE frame (never scrollback —
+# see classify()). Precedence in classify(): DIALOG > BUSY > IDLE > UNKNOWN.
+# BUSY and DIALOG are searched across the whole visible frame; only
+# IDLE/composer is tail-anchored (a one-frame output burst can push the status
+# line above the tail). An EMPTY regex disables its test.
 #
-# Verified against a LIVE Claude Code v2.1.186 capture. The interrupt hint
-# `esc to interrupt` anchors BUSY: it is pure ASCII and the single most stable
-# busy marker. NOTE: the real footer is middot-delimited ("· esc to interrupt ·"),
-# NOT parenthesized — match the bare substring, not "(esc to interrupt)".
+# A profile defines:
+#   P_CMD           launch command (the full-auto / skip-permissions variant)
+#   P_BUSY_RE       a turn is actively running. Anchor to the LIVE STATUS LINE
+#                   (interrupt hint); never bare gerunds/token counts — those
+#                   occur in settled prose and would pin BUSY forever.
+#   P_IDLE_RE       POSITIVE idle evidence (settled summary / empty-composer
+#                   placeholder). The shared COMPOSER_RE (❯ / > / › as last
+#                   non-blank line) is OR-ed in unless P_NO_COMPOSER=1.
+#                   State-invariant footers ("? for shortcuts") are NOT idle
+#                   evidence — they are on screen mid-turn too.
+#   P_DIALOG_RE     blocked on a HUMAN choice — gate on the interactive chooser
+#                   shape, not loose prose. The `>>> NEEDS_HUMAN:` sentinel is
+#                   ALWAYS OR-ed in by the loader, so the human-input contract
+#                   works for every agent.
+#   P_ALLOW_RE /    co-occurrence test for permission dialogs whose text alone
+#   P_CHOOSER_RE    is too prose-like ("Allow X to ..." + a chooser footer);
+#                   both must match. Empty = skip.
+#   P_TRUST_RE      first-run trust/onboarding dialog, auto-dismissed (Enter)
+#                   ONCE at spawn. Keep NARROW: too loose and dismiss_trust
+#                   could Enter into a real task dialog. Empty = none.
+#   P_TRUST_ACTIVE_RE  optional co-occurrence gate for TUIs that leave the
+#                   dismissed trust dialog in SCROLLBACK (cursor does): trust
+#                   handling fires only when this "chooser is live" marker is
+#                   also on screen. Empty = P_TRUST_RE alone decides.
+#   P_BOOT_RE       marker confirming the TUI finished booting (empty = first
+#                   non-blank screen counts as booted)
+#   P_INTERRUPT_KEY key `stop` sends to interrupt a running turn (Escape/C-c)
 #
-# BUSY — a turn is actively running. Anchored to the LIVE STATUS LINE only:
-#   the interrupt hint, or a spinner glyph at line-start on a line that also
-#   carries the hint, or the ctrl-c/esc stop-hint variants. We deliberately do
-#   NOT match bare gerunds/"...(N s)"/token counts — those occur in settled
-#   PROSE and would pin BUSY forever (false-negative / guaranteed TIMEOUT).
-BUSY_RE_UNICODE='esc to interrupt|(esc|ctrl-c)[[:space:]]+to[[:space:]]+(interrupt|stop|cancel)'
-BUSY_RE_ASCII='esc to interrupt|(esc|ctrl-c)[[:space:]]+to[[:space:]]+(interrupt|stop|cancel)'
+# Resolution order for `--agent <name>` (later steps override earlier):
+#   1. generic defaults   2. built-in case below   3. profile FILES, sourced in
+#   order: <script_dir>/profiles/<name>.profile then
+#   $ORCH_HOME/profiles/<name>.profile (user tuning wins, survives skill
+#   updates). Unknown name + no file = error. Profile files are plain shell
+#   setting P_* vars — same trust level as this script; only source your own.
 #
-# IDLE/DONE — turn finished, composer waiting. POSITIVE idle evidence only:
-#   an empty composer as the LAST non-blank line (glyph ❯ or ASCII >), or a
-#   settled past-tense summary ("Cooked for 2s"). The persistent footer
-#   ("? for shortcuts", "bypass permissions on") is STATE-INVARIANT — it is on
-#   screen mid-turn too — so it is NOT idle evidence here (it is used only for
-#   boot confirmation in cmd_spawn). The ❯ glyph is matched by its literal UTF-8
-#   bytes (\xe2\x9d\xaf) so it works even under LANG=C. COMPOSER_RE is built at
-#   runtime (printf the bytes) and OR-ed in.
-IDLE_RE_BASE='[A-Za-z][A-Za-z-]+ed for [0-9]+(\.[0-9]+)?s|^[[:space:]]*(Done|Finished)\b'
-#
-# DIALOG / NEEDS_INPUT — blocked on a HUMAN choice. Gated on the interactive
-# chooser shape (numbered option / "Esc to cancel" / explicit yes-no / trust),
-# NOT on loose prose, plus the worker-emitted sentinel.
-DIALOG_RE_BASE='>>> NEEDS_HUMAN:|Esc to cancel|^[[:space:]]*[0-9]+\.[[:space:]]+(Yes|No|Allow|Deny)\b|Do you want|Do you trust|\(y/n\)|trust the files'
-# "Allow X to ..." is a real permission dialog ONLY when it co-occurs with a
-# chooser footer; checked separately in classify() to avoid matching prose
-# like "We allow admins to edit".
-ALLOW_RE='Allow .* to '
-CHOOSER_RE='Esc to cancel|^[[:space:]]*[❯>]?[[:space:]]*[0-9]+\.'
-#
-# First-run trust dialog — auto-dismissed ONCE at spawn, never treated as
-# NEEDS_INPUT during a task. Kept narrow so it can't eat a real task dialog.
-# Real v2.1.186 text: "Quick safety check: Is this a project you created or one
-# you trust?" with "❯ 1. Yes, I trust this folder". Verified by live capture.
-TRUST_RE='Quick safety check|Is this a project you|trust this folder|Do you trust the files'
+# `claude` (the default) and `cursor` are VERIFIED against LIVE captures
+# (Claude Code v2.1.186: the middot-delimited "· esc to interrupt ·" footer
+# anchors BUSY, trust dialog "Quick safety check: … trust this folder";
+# Cursor Agent CLI v2026.07.01: "ctrl+c to stop" anchors BUSY, and its
+# dismissed trust dialog LINGERS in scrollback — hence P_TRUST_ACTIVE_RE).
+# codex/gemini are BEST-EFFORT from docs/screenshots: verify with `poll` on a
+# throwaway task first, then tune in a profile file, not in this script.
 
-# Literal-byte composer match (works under any locale; strip_ansi keeps bytes).
-COMPOSER_RE="$(printf '(^|[^[:alnum:]])(\xe2\x9d\xaf|>)[[:space:]]*$')"
+# Literal-byte composer match — an empty composer as the LAST non-blank line:
+# claude ❯ (\xe2\x9d\xaf), codex › (\xe2\x80\xba), or a bare ASCII >. Matched
+# by literal UTF-8 bytes so it works even under LANG=C (strip_ansi keeps bytes).
+COMPOSER_RE="$(printf '(^|[^[:alnum:]])(\xe2\x9d\xaf|\xe2\x80\xba|>)[[:space:]]*$')"
 
-# Tier selection — Unicode classes only behave as "one glyph" under UTF-8.
-pick_regex_tier() {
-  case "${LC_ALL:-${LC_CTYPE:-${LANG:-}}}" in
-    *[Uu][Tt][Ff]-8*|*[Uu][Tt][Ff]8*) BUSY_RE="$BUSY_RE_UNICODE" ;;
-    *) BUSY_RE="$BUSY_RE_ASCII" ;;
+PROFILE_LOADED=""
+load_profile() { # <name> — populate the P_* globals for one agent CLI
+  local name="${1:-claude}" f found=0
+  # 1) generic defaults — conservative markers shared by most agent TUIs
+  P_CMD=""
+  P_BUSY_RE='esc to interrupt|(esc|ctrl[-+]c)[[:space:]]+to[[:space:]]+(interrupt|stop|cancel)'
+  P_IDLE_RE=''
+  P_DIALOG_RE='^[[:space:]]*[0-9]+\.[[:space:]]+(Yes|No|Allow|Deny|Approve)\b|\(y/n\)|Do you want|Do you trust'
+  P_ALLOW_RE=''; P_CHOOSER_RE=''
+  P_TRUST_RE=''; P_TRUST_ACTIVE_RE=''; P_BOOT_RE=''
+  P_INTERRUPT_KEY='Escape'
+  P_NO_COMPOSER=0
+  # 2) built-ins
+  case "$name" in
+    claude)   # VERIFIED against live Claude Code v2.1.186 captures
+      found=1
+      P_CMD='claude --dangerously-skip-permissions'
+      P_IDLE_RE='[A-Za-z][A-Za-z-]+ed for [0-9]+(\.[0-9]+)?s|^[[:space:]]*(Done|Finished)\b'
+      P_DIALOG_RE='Esc to cancel|^[[:space:]]*[0-9]+\.[[:space:]]+(Yes|No|Allow|Deny)\b|Do you want|Do you trust|\(y/n\)|trust the files'
+      P_ALLOW_RE='Allow .* to '
+      P_CHOOSER_RE='Esc to cancel|^[[:space:]]*[❯>]?[[:space:]]*[0-9]+\.'
+      P_TRUST_RE='Quick safety check|Is this a project you|trust this folder|Do you trust the files'
+      P_BOOT_RE='bypass permissions on|\? for shortcuts|Welcome'
+      ;;
+    codex)    # BEST-EFFORT (unverified) — OpenAI Codex CLI
+      found=1
+      P_CMD='codex --dangerously-bypass-approvals-and-sandbox'
+      P_BUSY_RE='[Ee]sc to interrupt'
+      P_IDLE_RE='Ask Codex'   # empty-composer placeholder; composer › OR-ed in below
+      P_TRUST_RE='trust this (directory|folder)'
+      P_BOOT_RE='Codex'
+      ;;
+    gemini)   # BEST-EFFORT (unverified) — Google Gemini CLI
+      found=1
+      P_CMD='gemini --yolo'
+      P_BUSY_RE='esc to cancel'
+      P_IDLE_RE='Type your message'
+      P_DIALOG_RE='Apply this change|Allow execution|^[[:space:]]*●?[[:space:]]*[0-9]+\.[[:space:]]+(Yes|No)\b|\(y/n\)'
+      P_TRUST_RE='[Tt]rust this folder'
+      P_BOOT_RE='Tips for getting started|GEMINI'
+      ;;
+    cursor)   # VERIFIED against live Cursor Agent CLI v2026.07.01 captures
+      found=1
+      P_CMD='cursor-agent --force'
+      # "ctrl+c to stop" sits on the composer line only while a turn runs.
+      P_BUSY_RE='ctrl\+c to stop'
+      # Empty-composer placeholders (initial + follow-up). BUSY outranks IDLE,
+      # so the placeholder also being visible mid-turn is harmless.
+      P_IDLE_RE='Add a follow-up|Plan, search, build anything'
+      # Live-chooser hint line; it DISAPPEARS once the dialog is answered, so
+      # it cannot re-match from scrollback the way the dialog text itself does.
+      P_DIALOG_RE='Use arrow keys to navigate'
+      P_TRUST_RE='Workspace Trust Required|Trust this workspace'
+      # cursor leaves the dismissed trust box in scrollback — gate on the
+      # live-chooser hint so trust handling never fires on stale text.
+      P_TRUST_ACTIVE_RE='Use arrow keys to navigate'
+      P_BOOT_RE='Cursor Agent|Run Everything|-- INSERT --'
+      P_INTERRUPT_KEY='C-c'
+      # Composer is a box, not a ❯/> prompt — the shared composer regex could
+      # only false-positive on prose here.
+      P_NO_COMPOSER=1
+      ;;
+    generic)  # bring-your-own CLI: spawn --agent generic --cmd '<launch cmd>'
+      found=1
+      ;;
   esac
-  [ "${ORCH_ASCII_ONLY:-0}" = 1 ] && BUSY_RE="$BUSY_RE_ASCII"
-  IDLE_RE="$IDLE_RE_BASE|$COMPOSER_RE"
-  DIALOG_RE="$DIALOG_RE_BASE"
-  return 0
+  # 3) profile files (shipped next to the script, then user overrides)
+  for f in "$SCRIPT_DIR/profiles/$name.profile" "$ORCH_HOME/profiles/$name.profile"; do
+    if [ -f "$f" ]; then
+      # shellcheck disable=SC1090
+      . "$f"
+      found=1
+    fi
+  done
+  if [ "$found" -ne 1 ]; then PROFILE_LOADED=""; return 1; fi   # caller decides: die (spawn) or fall back (require_meta)
+  # The human-input sentinel contract holds for EVERY agent. Anchored to line
+  # start (allowing leading TUI decoration: indentation, ⏺, │, >) so the
+  # instruction ECHOED from the task prompt — where the sentinel sits
+  # mid-sentence, e.g. "print a line exactly: >>> NEEDS_HUMAN: ..." — can
+  # never false-match; only a line the worker actually EMITTED does.
+  P_DIALOG_RE='^[^[:alnum:]]*>>> NEEDS_HUMAN:'"${P_DIALOG_RE:+|$P_DIALOG_RE}"
+  [ "$P_NO_COMPOSER" = 1 ] || P_IDLE_RE="${P_IDLE_RE:+$P_IDLE_RE|}$COMPOSER_RE"
+  PROFILE_LOADED="$name"
 }
-pick_regex_tier
+# Cheap cache so per-poll classify in wait_engine doesn't re-source files.
+load_profile_cached() { [ "$PROFILE_LOADED" = "$1" ] || load_profile "$1"; }
 
 # How many bottom lines the IDLE/composer test scans (the TUI pins the composer
-# at the very bottom). BUSY/DIALOG search the whole capture, not just the tail.
+# at the very bottom). BUSY/DIALOG search the whole visible frame, not just the tail.
 CLASSIFY_TAIL="${CLASSIFY_TAIL:-25}"
 # ─────────────────────────────────────────────────────────────────────────────
 
@@ -127,10 +215,21 @@ meta_file() { echo "${ORCH_HOME}/$1.meta"; }
 require_meta() {
   local f; f="$(meta_file "$1")"
   [ -f "$f" ] || die "unknown worker '$1' (no meta at $f). Try: orchestrate list"
+  # CREATED is never read by code (humans inspect it in metas) — reset it
+  # anyway so one worker's value can't leak into the next meta sourced.
+  # shellcheck disable=SC2034
+  CREATED=""; MUX=""; TARGET=""; DIR=""; AGENT=""
   # shellcheck disable=SC1090
-  MUX=""; TARGET=""; DIR=""; CREATED=""
   . "$f"
   [ -n "${MUX:-}" ] && [ -n "${TARGET:-}" ] || die "corrupt meta for '$1'"
+  AGENT="${AGENT:-claude}"          # metas from before profiles existed
+  # A worker must stay reachable (poll/logs/STOP) even if its profile file was
+  # deleted after spawn — fall back to generic detection rather than dying.
+  if ! load_profile_cached "$AGENT"; then
+    log "worker '$1': profile '$AGENT' not found; using generic detection"
+    AGENT=generic
+    load_profile generic
+  fi
 }
 
 # ─── Mux dispatch layer ──────────────────────────────────────────────────────
@@ -249,33 +348,55 @@ mux_attach()     { "${MUX}_attach"     "$TARGET" "$1" "$2"; }
 
 # ─── Shared helpers ──────────────────────────────────────────────────────────
 
+# Is the first-run trust dialog LIVE on this screen? Requires P_TRUST_RE, and
+# — when the profile sets P_TRUST_ACTIVE_RE (TUIs that leave the dismissed
+# dialog in scrollback) — the live-chooser marker too.
+trust_on_screen() { # <stripped screen> -> 0 if live trust dialog
+  [ -n "$P_TRUST_RE" ] || return 1
+  printf '%s' "$1" | grep -qE "$P_TRUST_RE" || return 1
+  [ -z "$P_TRUST_ACTIVE_RE" ] || printf '%s' "$1" | grep -qE "$P_TRUST_ACTIVE_RE"
+}
+
 # Dismiss ONLY the first-run trust dialog. Never cancels a real task dialog.
+# Uses the CURRENT worker's profile (require_meta/spawn loaded it).
 dismiss_trust() {
+  [ -n "$P_TRUST_RE" ] || return 0
   local screen
-  screen="$(mux_capture 60 | strip_ansi)" || return 0
-  if printf '%s' "$screen" | grep -qE "$TRUST_RE"; then
+  screen="$(mux_capture | strip_ansi)" || return 0
+  if trust_on_screen "$screen"; then
     mux_send_key Enter; sleep 1            # first-run trust: default = accept (see residual risk)
   fi
   return 0
 }
 
-# Classify a stripped screen -> BUSY|IDLE|NEEDS_INPUT|UNKNOWN.
-# DIALOG/BUSY scan the WHOLE screen; IDLE/composer is tail-anchored. Precedence
-# DIALOG > BUSY > IDLE > UNKNOWN is load-bearing. A footer-only screen with no
-# positive idle/busy/dialog evidence is UNKNOWN (never a false DONE).
-classify() {
-  local full tail
+# Classify a stripped screen -> BUSY|IDLE|NEEDS_INPUT|UNKNOWN, using the
+# CURRENTLY LOADED profile's regexes (empty regex = test skipped — an empty
+# pattern would otherwise match EVERYTHING under grep -E).
+# Callers MUST pass the VISIBLE frame only (mux_capture with no lines arg):
+# classification asks "what state is the worker in NOW", and scrollback retains
+# stale frames verbatim — e.g. cursor keeps the pre-dismissal trust dialog
+# (live-chooser hint included) in history forever, which would pin NEEDS_INPUT.
+# Scrollback is for `logs`, never for classify.
+# DIALOG/BUSY scan the whole visible frame; IDLE/composer is tail-anchored.
+# Precedence DIALOG > BUSY > IDLE > UNKNOWN is load-bearing. A footer-only
+# screen with no positive idle/busy/dialog evidence is UNKNOWN (never a false
+# DONE).
+classify() { # <stripped visible frame> [skip_dialog 0|1]
+  local full tail skip_dialog="${2:-0}"
   full="$1"
   tail="$(printf '%s\n' "$full" | tail_region)"
-  # DIALOG (whole screen)
-  if printf '%s' "$full" | grep -qE "$DIALOG_RE"; then echo NEEDS_INPUT; return; fi
-  if printf '%s' "$full" | grep -qE "$ALLOW_RE" && printf '%s' "$full" | grep -qE "$CHOOSER_RE"; then
-    echo NEEDS_INPUT; return
+  # DIALOG (whole screen; P_DIALOG_RE always non-empty — loader adds sentinel)
+  if [ "$skip_dialog" -ne 1 ]; then
+    if printf '%s' "$full" | grep -qE "$P_DIALOG_RE"; then echo NEEDS_INPUT; return; fi
+    if [ -n "$P_ALLOW_RE" ] && [ -n "$P_CHOOSER_RE" ] \
+       && printf '%s' "$full" | grep -qE "$P_ALLOW_RE" && printf '%s' "$full" | grep -qE "$P_CHOOSER_RE"; then
+      echo NEEDS_INPUT; return
+    fi
   fi
   # BUSY (whole screen — status line may be pushed above the tail by an output burst)
-  if printf '%s' "$full" | grep -qE "$BUSY_RE"; then echo BUSY; return; fi
+  if [ -n "$P_BUSY_RE" ] && printf '%s' "$full" | grep -qE "$P_BUSY_RE"; then echo BUSY; return; fi
   # IDLE (tail-anchored: composer or settled summary must be near the bottom)
-  if printf '%s' "$tail" | grep -qE "$IDLE_RE"; then echo IDLE; return; fi
+  if [ -n "$P_IDLE_RE" ] && printf '%s' "$tail" | grep -qE "$P_IDLE_RE"; then echo IDLE; return; fi
   echo UNKNOWN
 }
 
@@ -283,6 +404,7 @@ classify() {
 
 cmd_spawn() {
   local id="" dir="$PWD" mux="auto" flags="" allow_shared=0
+  local agent="${ORCH_AGENT:-claude}" cmd_override=""
   [ $# -ge 1 ] && { id="$1"; shift; }
   [ -n "$id" ] || die "spawn: need an <id>"
   # ids name tmux sessions (no '.'/':' allowed) and key waitall's <id>=<STATE>
@@ -292,6 +414,8 @@ cmd_spawn() {
     case "$1" in
       --dir)              dir="$2"; shift 2 ;;
       --mux)              mux="$2"; shift 2 ;;
+      --agent)            agent="$2"; shift 2 ;;
+      --cmd)              cmd_override="$2"; shift 2 ;;
       --flags)            flags="$2"; shift 2 ;;
       --allow-shared-dir) allow_shared=1; shift ;;
       *) die "spawn: unknown arg '$1'" ;;
@@ -301,13 +425,15 @@ cmd_spawn() {
   dir="$(cd "$dir" && pwd)"
   [ "$mux" = "auto" ] && mux="$(detect_mux)"
   [ "$mux" = tmux ] || [ "$mux" = cmux ] || die "spawn: --mux must be tmux|cmux|auto"
+  load_profile "$agent" \
+    || die "spawn: unknown agent profile '$agent' (built-ins: claude cursor codex gemini generic; or create $ORCH_HOME/profiles/$agent.profile)"
 
   mkdir -p "$ORCH_HOME"
   # keep state out of any repo even if ORCH_HOME was pointed inside one
   [ -f "$ORCH_HOME/.gitignore" ] || printf '*\n' > "$ORCH_HOME/.gitignore"
   [ -f "$(meta_file "$id")" ] && die "spawn: worker '$id' already exists (stop it first)"
 
-  # same-dir footgun guard (--dangerously-skip-permissions has no approval gate)
+  # same-dir footgun guard (full-auto workers have no approval gate)
   if [ "$allow_shared" -ne 1 ]; then
     local f odir
     shopt -s nullglob
@@ -317,26 +443,34 @@ cmd_spawn() {
     done
   fi
 
-  local cmd="claude --dangerously-skip-permissions"
+  local cmd="${cmd_override:-$P_CMD}"
+  [ -n "$cmd" ] || die "spawn: profile '$agent' has no launch command; pass --cmd '<launch command>'"
   [ -n "$flags" ] && cmd="$cmd $flags"
 
-  log "spawning '$id' via $mux in $dir"
+  log "spawning '$id' ($agent) via $mux in $dir"
   local target
   target="$("${mux}_spawn" "$id" "$dir" "$cmd")" || die "spawn failed"
 
-  { echo "MUX=$mux"; echo "TARGET=$target"; echo "DIR=$dir"; echo "CREATED=$(date +%s)"; } > "$(meta_file "$id")"
+  { echo "MUX=$mux"; echo "TARGET=$target"; echo "DIR=$dir"; echo "CREATED=$(date +%s)"; echo "AGENT=$agent"; } > "$(meta_file "$id")"
   MUX="$mux"; TARGET="$target"
 
   # Wait for boot (~5-10s) + dismiss the conditional first-run trust dialog.
   # NOTE: this loop sleeps up to ~40s — callers should run spawn in background.
-  local i screen
+  local i screen booted
   for i in $(seq 1 40); do
-    screen="$(mux_capture 60 | strip_ansi)" || true
-    if printf '%s' "$screen" | grep -qE "$TRUST_RE"; then
+    screen="$(mux_capture | strip_ansi)" || true
+    if trust_on_screen "$screen"; then
       log "dismissing first-run trust dialog"
       mux_send_key Enter; sleep 1; continue
     fi
-    if printf '%s' "$screen" | grep -qE 'bypass permissions on|\? for shortcuts|Welcome'; then
+    booted=0
+    if [ -n "$P_BOOT_RE" ]; then
+      printf '%s' "$screen" | grep -qE "$P_BOOT_RE" && booted=1
+    else
+      # no boot marker known for this profile: any rendered output counts
+      printf '%s' "$screen" | grep -q '[^[:space:]]' && booted=1
+    fi
+    if [ "$booted" -eq 1 ]; then
       log "'$id' booted (target=$target)"
       echo "$id"; return 0
     fi
@@ -358,8 +492,8 @@ deliver_prompt() { # <id> <file> <inline> <got_inline> <enter_delay> <answer>
   # block the legitimate reply. Never pass --answer on the agent's own call.
   if [ "$answer" -ne 1 ]; then
     local probe
-    probe="$(mux_capture 60 | strip_ansi)" || probe=""
-    if printf '%s' "$probe" | grep -qE "$DIALOG_RE" && ! printf '%s' "$probe" | grep -qE "$TRUST_RE"; then
+    probe="$(mux_capture | strip_ansi)" || probe=""
+    if ! trust_on_screen "$probe" && printf '%s' "$probe" | grep -qE "$P_DIALOG_RE"; then
       die "send: worker '$id' is at a human-decision dialog (NEEDS_INPUT). Surface it to the user; deliver THEIR decision with --answer. Do not auto-answer."
     fi
   fi
@@ -437,12 +571,21 @@ cmd_run() {
   done
   [ "$interval" -ge 1 ] || interval=1   # engine re-clamps the rest
   require_meta "$id"
+  # --answer: snapshot the dialog lines being answered BEFORE submitting, so
+  # the wait below can tell the already-answered (still-on-screen) sentinel
+  # from a genuinely new NEEDS_INPUT (see wait_engine).
+  local stale_dialog=""
+  if [ "$answer" -eq 1 ]; then
+    local pre
+    pre="$(mux_capture | strip_ansi)" || pre=""
+    stale_dialog="$(printf '%s\n' "$pre" | { grep -E "$P_DIALOG_RE" || true; } | sort -u)"
+  fi
   deliver_prompt "$id" "$file" "$inline" "$got_inline" "$enter_delay" "$answer"
   # One-interval grace before the first classify: let the submitted turn
   # visibly start, so a lingering pre-turn idle frame can't seed the settled
   # window into a false instant DONE.
   sleep "$interval"
-  wait_engine "$timeout" "$idle_cycles" "$interval" "$max_interval" 0 "$id"
+  WAIT_STALE_DIALOG="$stale_dialog" wait_engine "$timeout" "$idle_cycles" "$interval" "$max_interval" 0 "$id"
   report_single "$id" "$show_screen"
 }
 
@@ -452,7 +595,7 @@ cmd_poll() {
   # single existence probe (instant command) — wait/waitall do the 3-strike confirm
   if ! mux_alive; then echo "STATE=GONE"; return; fi
   local screen state
-  screen="$(mux_capture 60 | strip_ansi)" || { echo "STATE=UNKNOWN"; return; }
+  screen="$(mux_capture | strip_ansi)" || { echo "STATE=UNKNOWN"; return; }
   state="$(classify "$screen")"
   echo "STATE=$state"
   echo "──────── last lines ────────"
@@ -490,15 +633,15 @@ wait_engine() { # <timeout> <idle_cycles> <interval> <max_interval> <any 0|1> <i
   [ "$max_iv" -ge "$base_iv" ] || max_iv="$base_iv"   # ceiling never below the base
   ENG_IDS=("$@"); ENG_STATE=(); ENG_SCREEN=(); ENG_NTERM=0
   local total="$#" i id
-  local -a emux etgt term prevh consec gone prevst
+  local -a emux etgt eagent term prevh consec gone prevst
   for i in "${!ENG_IDS[@]}"; do
     id="${ENG_IDS[$i]}"
     require_meta "$id"
-    emux[i]="$MUX"; etgt[i]="$TARGET"
+    emux[i]="$MUX"; etgt[i]="$TARGET"; eagent[i]="$AGENT"
     ENG_STATE[i]=UNKNOWN; ENG_SCREEN[i]=""
     term[i]=0; prevh[i]=""; consec[i]=0; gone[i]=0; prevst[i]=""
   done
-  local start now elapsed left cur="$base_iv" nterm=0 snap transition screen state h
+  local start now elapsed left cur="$base_iv" nterm=0 snap transition screen state h curmatch
   start="$(date +%s)"
   while :; do
     now="$(date +%s)"; elapsed=$(( now - start ))
@@ -522,9 +665,24 @@ wait_engine() { # <timeout> <idle_cycles> <interval> <max_interval> <any 0|1> <i
         continue
       fi
       gone[i]=0
-      screen="$(mux_capture 60 | strip_ansi)" || continue   # transient read failure: skip the sample, keep counters
+      screen="$(mux_capture | strip_ansi)" || continue   # transient read failure: skip the sample, keep counters
       ENG_SCREEN[i]="$screen"
+      # mixed fleet: classify with THIS worker's regexes (eagent holds the
+      # RESOLVED name from require_meta, so this can only fail if a profile
+      # file vanished mid-wait — degrade to generic, never abort the loop)
+      load_profile_cached "${eagent[$i]}" || load_profile generic
       state="$(classify "$screen")"
+      # Stale-dialog suppression (run --answer): a chooser closes when
+      # answered, but an emitted `>>> NEEDS_HUMAN:` sentinel stays in the
+      # transcript — without this, the wait after --answer would re-report the
+      # very dialog the human just answered, before the follow-up turn even
+      # runs. If the CURRENT dialog-matched lines are exactly the ones on
+      # screen at answer time, they are stale: reclassify without the dialog
+      # tests. Any change (new dialog, new sentinel, extra lines) still fires.
+      if [ "$state" = NEEDS_INPUT ] && [ -n "${WAIT_STALE_DIALOG:-}" ]; then
+        curmatch="$(printf '%s\n' "$screen" | { grep -E "$P_DIALOG_RE" || true; } | sort -u)"
+        [ "$curmatch" = "$WAIT_STALE_DIALOG" ] && state="$(classify "$screen" 1)"
+      fi
       [ "$state" = "${prevst[$i]}" ] || transition=1
       prevst[i]="$state"
       ENG_STATE[i]="$state"
@@ -647,7 +805,7 @@ cmd_attach() {
 
 cmd_list() {
   mkdir -p "$ORCH_HOME"
-  printf '%-16s %-6s %-22s %-12s %s\n' ID MUX TARGET STATE DIR
+  printf '%-16s %-8s %-6s %-22s %-12s %s\n' ID AGENT MUX TARGET STATE DIR
   local f id
   shopt -s nullglob
   for f in "$ORCH_HOME"/*.meta; do
@@ -655,9 +813,9 @@ cmd_list() {
     require_meta "$id" 2>/dev/null || continue
     local state="gone"
     if mux_alive; then
-      state="$(classify "$(mux_capture 60 | strip_ansi)")"
+      state="$(classify "$(mux_capture | strip_ansi)")"
     fi
-    printf '%-16s %-6s %-22s %-12s %s\n' "$id" "$MUX" "$TARGET" "$state" "$DIR"
+    printf '%-16s %-8s %-6s %-22s %-12s %s\n' "$id" "$AGENT" "$MUX" "$TARGET" "$state" "$DIR"
   done
 }
 
@@ -671,7 +829,7 @@ cmd_stop() {
   fi
   require_meta "$id"
   if mux_alive; then
-    mux_send_key Escape 2>/dev/null || true   # interrupt any running turn first
+    mux_send_key "$P_INTERRUPT_KEY" 2>/dev/null || true   # interrupt any running turn first
     sleep 1
     mux_kill
   fi
@@ -697,17 +855,23 @@ cmd_gc() {
 
 usage() {
   cat >&2 <<EOF
-orchestrate.sh — drive worker \`claude\` sessions in tmux or cmux.
+orchestrate.sh — drive worker agent-CLI sessions (claude by default) in tmux or cmux.
 
 Loop commands print machine lines on STDOUT (diagnostics on stderr):
   run/wait -> one line  STATE=DONE|NEEDS_INPUT|TIMEOUT|GONE
   waitall  -> one <id>=<STATE> line per target + final BATCH=<terminal>/<total>
   poll     -> first line STATE=BUSY|IDLE|NEEDS_INPUT|UNKNOWN|GONE
 
-  spawn <id> [--dir <path>] [--mux tmux|cmux|auto] [--flags "<extra>"] [--allow-shared-dir]
-        Launch \`claude --dangerously-skip-permissions\`, dismiss first-run dialog.
-        Sleeps during boot (~40s) — run as a BACKGROUND command. Refuses a --dir
-        already in use by a live worker unless --allow-shared-dir. id: [A-Za-z0-9_-]+.
+  spawn <id> [--dir <path>] [--mux tmux|cmux|auto] [--agent <profile>] [--cmd "<launch cmd>"]
+             [--flags "<extra>"] [--allow-shared-dir]
+        Launch the agent CLI in full-auto mode, dismiss its first-run dialog.
+        --agent picks a profile (built-ins: claude [default, verified], cursor
+        [verified], codex, gemini [best-effort], generic; or
+        \$ORCH_HOME/profiles/<name>.profile).
+        --cmd overrides the launch command (detection still via the profile);
+        --flags appends to it. Sleeps during boot (~40s) — run as a BACKGROUND
+        command. Refuses a --dir already in use by a live worker unless
+        --allow-shared-dir. id: [A-Za-z0-9_-]+.
   run   <id> [--file <f> | -- <text...>] [--answer] [--timeout <s>] [--idle-cycles <k>]
              [--interval <s>] [--max-interval <s>] [--screen] [--enter-delay <s>]
         send+wait FUSED: submit the prompt (or stdin), block until the worker
@@ -745,8 +909,13 @@ snapping back to base the moment anything changes (esp. IDLE, which arms the
 settled window). DONE still = --idle-cycles (min 2) consecutive IDLE polls with
 an unchanged volatility-normalized tail. NOTHING is ever killed on timeout.
 
+Agent profiles: a profile = launch command + TUI-detection regexes (busy/idle/
+dialog/trust/boot). Add any CLI without touching this script by dropping a
+shell file setting P_* vars at \$ORCH_HOME/profiles/<name>.profile (see the
+"Agent profiles" block at the top of this script for the contract).
+
 State dir: $ORCH_HOME
-Env: ORCH_HOME, ORCH_TMUX_SOCK, ORCH_ASCII_ONLY, CLASSIFY_TAIL.
+Env: ORCH_HOME, ORCH_TMUX_SOCK, ORCH_AGENT (default --agent), CLASSIFY_TAIL.
 EOF
   exit 1
 }

@@ -1,11 +1,11 @@
 ---
 name: orchestrate
-description: 'Delegate one or more coding tasks to background worker `claude` sessions and babysit them — spawn each in its own tmux pane or cmux workspace, send a prompt, poll/wait for completion, collect the result, then stop. Use when the user says "spin up a worker / sub-agent to do X", "run these in parallel", "fan this out", "delegate X while I keep working", "drive another claude", or otherwise wants long-running tasks handled by separate claude instances you supervise. SAFETY: workers run with --dangerously-skip-permissions (no per-action approval) in whatever directory you point them at — only use on repos/dirs the user trusts you to modify autonomously, and surface NEEDS_INPUT to a human rather than auto-answering.'
+description: 'Delegate one or more coding tasks to background worker agent-CLI sessions (claude by default; codex, gemini, or any other agent CLI via profiles) and babysit them — spawn each in its own tmux pane or cmux workspace, send a prompt, poll/wait for completion, collect the result, then stop. Use when the user says "spin up a worker / sub-agent to do X", "run these in parallel", "fan this out", "delegate X while I keep working", "drive another claude / codex / gemini", or otherwise wants long-running tasks handled by separate agent instances you supervise. SAFETY: workers run in full-auto mode (e.g. claude --dangerously-skip-permissions — no per-action approval) in whatever directory you point them at — only use on repos/dirs the user trusts you to modify autonomously, and surface NEEDS_INPUT to a human rather than auto-answering.'
 ---
 
 # orchestrate
 
-Drive background worker `claude` sessions from this session. Each worker lives in its own tmux pane (private socket) or cmux workspace; you supervise by screen-scraping its TUI. One script, `orchestrate.sh`, backs every step and is mux-agnostic. Loop commands print machine-parseable `KEY=VALUE` lines on **stdout** (diagnostics go to stderr): you parse one line per worker, never a screen dump.
+Drive background worker agent-CLI sessions from this session — `claude` by default, other agent CLIs via `--agent` (see "Agent profiles" below). Each worker lives in its own tmux pane (private socket) or cmux workspace; you supervise by screen-scraping its TUI. One script, `orchestrate.sh`, backs every step and is mux- and agent-agnostic. Loop commands print machine-parseable `KEY=VALUE` lines on **stdout** (diagnostics go to stderr): you parse one line per worker, never a screen dump.
 
 ```bash
 # `orchestrate.sh` ships in THIS skill's directory (next to this SKILL.md). Set
@@ -20,9 +20,9 @@ ORCH="$(command ls \
 
 ## SAFETY (read first)
 
-Workers launch `claude --dangerously-skip-permissions` — they edit files and run commands **with no approval prompts**. Only spawn against directories the user has entrusted to autonomous work. Never auto-answer a worker's dialog: when `run`/`wait`/`waitall`/`poll` reports `NEEDS_INPUT`, **surface the rendered dialog (`poll` or `logs`) to the user and let a human decide.** Deliver their decision with `--answer` — `send`/`run` refuse to type into a live human-decision dialog without it, and you must NEVER pass `--answer` on your own initiative. The only auto-dismiss is the one-time first-run folder-trust prompt at spawn (an environment prompt, not a task decision).
+Workers launch their agent CLI in **full-auto mode** (`claude --dangerously-skip-permissions`, `codex --dangerously-bypass-approvals-and-sandbox`, `gemini --yolo`, or whatever the profile's `P_CMD` says) — they edit files and run commands **with no approval prompts**. Only spawn against directories the user has entrusted to autonomous work. Never auto-answer a worker's dialog: when `run`/`wait`/`waitall`/`poll` reports `NEEDS_INPUT`, **surface the rendered dialog (`poll` or `logs`) to the user and let a human decide.** Deliver their decision with `--answer` — `send`/`run` refuse to type into a live human-decision dialog without it, and you must NEVER pass `--answer` on your own initiative. The only auto-dismiss is the one-time first-run folder-trust prompt at spawn (an environment prompt, not a task decision).
 
-**`DONE` does not mean "task complete."** It means the worker's screen settled into an idle composer. A worker can settle while asking you a free-text clarifying question ("Should I use approach A or B?") — that prose is NOT detectable as a dialog. So after every `STATE=DONE`: **read the collected `logs` and look for a trailing question or an unfinished plan before you send the next prompt or `stop`.** To make this machine-detectable, the recommended spawn prompt tells workers to emit a sentinel line `>>> NEEDS_HUMAN: <question>` when they need you; that sentinel IS detected and surfaced as `NEEDS_INPUT`.
+**`DONE` does not mean "task complete."** It means the worker's screen settled into an idle composer. A worker can settle while asking you a free-text clarifying question ("Should I use approach A or B?") — that prose is NOT detectable as a dialog. So after every `STATE=DONE`: **read the collected `logs` and look for a trailing question or an unfinished plan before you send the next prompt or `stop`.** To make this machine-detectable, the recommended spawn prompt tells workers to emit a sentinel line `>>> NEEDS_HUMAN: <question>` when they need you; that sentinel IS detected and surfaced as `NEEDS_INPUT`. Detection is anchored to the START of a line, so keep the sentinel mid-sentence in your own prompts (as the recommended contract phrasing does) — the echoed instruction then can't false-trigger it.
 
 **Never kill on timeout.** `STATE=TIMEOUT` means still alive, just slow. Nothing in `run`/`wait`/`waitall` ever kills a worker — only you do, via `stop`, once the task is truly finished.
 
@@ -39,7 +39,7 @@ spawn ─▶ run(prompt) ─▶ STATE=DONE ─▶ logs ─▶ act ─▶ run(nex
 `run` fuses send+wait and is the loop primitive: submit a prompt, block until the worker settles, print **exactly one stdout line** — `STATE=DONE|NEEDS_INPUT|TIMEOUT|GONE`. `run`, `wait`, and `waitall` sleep internally: **always run them as BACKGROUND commands** (the harness cannot run foreground sleeps).
 
 1. **spawn** a worker with a stable id (`[A-Za-z0-9_-]+`), in a dir **the user explicitly trusts for autonomous, unprompted edits**.
-   `"$ORCH" spawn fix-auth --dir /path/to/repo` (add `--mux tmux|cmux` to force a backend; default auto). Sleeps during boot (~up to 40s) — BACKGROUND. Prepend your task with the human-input contract, e.g.:
+   `"$ORCH" spawn fix-auth --dir /path/to/repo` (add `--mux tmux|cmux` to force a backend, default auto; add `--agent codex|gemini|generic|<custom>` for a non-claude worker — see "Agent profiles"). Sleeps during boot (~up to 40s) — BACKGROUND. Prepend your task with the human-input contract, e.g.:
    `"If you need a human decision, print a line exactly: >>> NEEDS_HUMAN: <your question> and stop."`
 2. **run** the task prompt (sources: `--file task.md`, `-- <inline text...>`, or stdin; multiline is pasted as one block, never submitted line-by-line):
    ```bash
@@ -62,7 +62,7 @@ Live states (what `poll`/`list` show, and what `waitall --any` reports for still
 |---|---|---|
 | `BUSY` | A turn is running (status line with `esc to interrupt`, or `ctrl-c to stop/cancel`). | Keep waiting. |
 | `IDLE` | Turn finished, composer empty and waiting (last non-blank line is the `❯`/`>` composer), or a settled past-tense summary. `run`/`wait`/`waitall` only call `DONE` after several consecutive IDLE polls with an **unchanged** screen (volatile counters normalized out) — a brief pause between tool calls won't fool it. | Collect, read for trailing questions, then `run` the next prompt or `stop`. |
-| `NEEDS_INPUT` | Blocked on a human choice: a chooser dialog (numbered options / `Esc to cancel` / `Do you want` / `(y/n)`), or the worker printed the `>>> NEEDS_HUMAN:` sentinel. | **Surface to the user. Do not auto-answer.** After they decide, deliver it: `"$ORCH" run fix-auth --answer -- "1"` (`--answer` asserts a HUMAN made this choice — required because the dialog/sentinel is still on screen). |
+| `NEEDS_INPUT` | Blocked on a human choice: a chooser dialog (numbered options / `Esc to cancel` / `Do you want` / `(y/n)`), or the worker printed the `>>> NEEDS_HUMAN:` sentinel at the start of a line. | **Surface to the user. Do not auto-answer.** After they decide, deliver it: `"$ORCH" run fix-auth --answer -- "1"` (`--answer` asserts a HUMAN made this choice — required because the dialog/sentinel is still on screen). `run --answer` also snapshots the dialog lines being answered and ignores them (while unchanged) during its wait, so its verdict reflects the follow-up turn — a NEW dialog or sentinel still fires. |
 | `UNKNOWN` | No marker matched (e.g. long thinking with no spinner, or a footer-only screen). Treated as "not done". | Keep waiting; nothing advances toward DONE on UNKNOWN. |
 
 Terminal states — the one-line verdicts of `run`/`wait` (`STATE=<x>`) and per-id in `waitall` (`<id>=<x>`):
@@ -76,7 +76,7 @@ Terminal states — the one-line verdicts of `run`/`wait` (`STATE=<x>`) and per-
 
 Give each a distinct id and spawn independently — they are fully isolated (separate tmux sessions / cmux workspaces).
 
-**NEVER point two workers at the same `--dir`.** Both run with `--dangerously-skip-permissions`; two in one directory will clobber each other's edits and race on the git index with no approval gate to stop them. Each worker MUST get its own git worktree (`git worktree add ../wt-<id>`) or its own copy. `spawn` refuses a `--dir` already in use by a live worker unless you pass `--allow-shared-dir`.
+**NEVER point two workers at the same `--dir`.** Both run in full-auto mode; two in one directory will clobber each other's edits and race on the git index with no approval gate to stop them. Each worker MUST get its own git worktree (`git worktree add ../wt-<id>`) or its own copy. `spawn` refuses a `--dir` already in use by a live worker unless you pass `--allow-shared-dir`.
 
 The batch pattern is `send` to each (no waiting), then ONE `waitall` loop over the fleet:
 
@@ -107,11 +107,40 @@ while [ "${#pending[@]}" -gt 0 ]; do
 done
 ```
 
-`waitall` observes only — it never kills, restarts, or answers anything. `list` remains the one-glance human table of all workers.
+`waitall` observes only — it never kills, restarts, or answers anything. `list` remains the one-glance human table of all workers. Fleets can mix agents freely (`waitall` classifies each worker with its own profile's regexes):
+
+```bash
+"$ORCH" spawn w_claude --dir ../wt-a                  # default: claude
+"$ORCH" spawn w_codex  --dir ../wt-b --agent codex    # same task, different agent
+```
+
+## Agent profiles (other CLIs)
+
+A worker's behavior is defined by an **agent profile**: the full-auto launch command plus the regexes that read its TUI (busy / idle / dialog / trust / boot). Pick one at spawn with `--agent <name>` (or `ORCH_AGENT`); it is recorded in the worker's meta, so every later command classifies that worker correctly.
+
+- **`claude`** — the default; **verified against live captures**.
+- **`cursor`** — Cursor Agent CLI (`cursor-agent --force`); **verified against live captures**, including the full spawn → run → sentinel → `--answer` loop.
+- **`codex`**, **`gemini`** — built-in but **best-effort**: launch flags are right, detection regexes are from docs/screenshots. Before trusting a fleet to one, run a throwaway task and check `poll` classifies BUSY/IDLE/NEEDS_INPUT sanely; tune in a profile file if not.
+- **`generic`** — conservative shared markers (interrupt hints for BUSY, an empty composer `❯`/`›`/`>` as last non-blank line for IDLE, numbered Yes/No or `(y/n)` choosers for DIALOG). Bring your own launch command: `spawn w1 --agent generic --cmd 'aider --yes-always'`.
+
+Any other CLI gets a **profile file** — no script edit needed. Drop a shell fragment at `$ORCH_HOME/profiles/<name>.profile` (user tuning; overrides same-named built-ins too) or `profiles/<name>.profile` next to the script (ships with the skill), then `spawn w1 --agent <name>`:
+
+```bash
+# $ORCH_HOME/profiles/aider.profile — set only what differs from generic
+P_CMD='aider --yes-always'
+P_BUSY_RE='esc to interrupt'          # a turn is running (live status line only)
+P_IDLE_RE=''                          # settled markers; composer ❯/›/> auto-appended
+P_DIALOG_RE='\(Y\)es/\(N\)o'          # human choosers (>>> NEEDS_HUMAN: auto-appended)
+P_TRUST_RE=''                         # first-run dialog to auto-dismiss at spawn (keep NARROW)
+P_BOOT_RE=''                          # boot marker (empty = first non-blank screen)
+P_INTERRUPT_KEY='C-c'                 # what `stop` sends to interrupt (default Escape)
+```
+
+The full contract (all `P_*` vars, precedence, empty-regex semantics) is documented in the "Agent profiles" block at the top of `orchestrate.sh`. The `>>> NEEDS_HUMAN:` sentinel and the composer fallback are appended to every profile by the loader, so the human-input contract and DONE detection work the same for all agents. `--cmd` on spawn overrides just the launch command; `--flags "<extra>"` appends to it.
 
 ## Recovery / cleanup
 
-Workers are detached processes; if this orchestrator crashes between `spawn` and `stop`, the worker keeps running `claude --dangerously-skip-permissions` and burning tokens. To reap orphans:
+Workers are detached processes; if this orchestrator crashes between `spawn` and `stop`, the worker keeps running its agent CLI in full-auto mode and burning tokens. To reap orphans:
 
 - `"$ORCH" stop --all` — stop every worker that still has a meta in this `ORCH_HOME`.
 - `"$ORCH" gc` — sweep the private tmux socket for orphaned worker sessions tagged for THIS `ORCH_HOME` (sessions whose meta is gone) and kill them. Run this after a crash. (cmux workspaces survive in the GUI and can be closed there or via `stop`.)
@@ -128,4 +157,4 @@ Workers are detached processes; if this orchestrator crashes between `spawn` and
 
 **Adaptive cadence.** `run`/`wait`/`waitall` poll on an adaptive clock: sleeps start at `--interval` (default 3s) and double while the screen stays `BUSY`/`UNKNOWN` with no state change, capped at `--max-interval` (default 10s, never below the base). Any state change — in particular going `IDLE`, which arms the settled window — snaps the cadence back to `--interval`, so `DONE` lands within a few polls of the turn actually finishing; the final sleep is clamped so the `--timeout` deadline is checked on time. For hour-long turns raise `--max-interval` (e.g. 30) to make steady-state supervision near-free. Completion detection itself never changes: `DONE` = `--idle-cycles` (default 3, min 2) consecutive `IDLE` polls with an unchanged volatility-normalized screen tail. For bursty multi-tool runs that pause often, raise `--idle-cycles` (4–5).
 
-**Env vars.** `ORCH_HOME` (state dir, default `${XDG_STATE_HOME:-$HOME/.local/state}/orchestrate` — outside any repo so meta files with absolute paths never get committed), `ORCH_TMUX_SOCK`, `ORCH_ASCII_ONLY=1` (force ASCII detection under non-UTF-8 locales), `CLASSIFY_TAIL` (how many bottom lines the idle/composer test scans; busy/dialog markers are searched across the whole capture). The detection regexes are centralized and commented at the top of `orchestrate.sh` — tune there if a future TUI version changes its markers.
+**Env vars.** `ORCH_HOME` (state dir, default `${XDG_STATE_HOME:-$HOME/.local/state}/orchestrate` — outside any repo so meta files with absolute paths never get committed), `ORCH_TMUX_SOCK`, `ORCH_AGENT` (default for `spawn --agent`), `CLASSIFY_TAIL` (how many bottom lines the idle/composer test scans; busy/dialog markers are searched across the whole capture). The detection regexes live in the agent profiles at the top of `orchestrate.sh` — if a future TUI version changes its markers, tune the built-in there or shadow it with a `$ORCH_HOME/profiles/<name>.profile` file.
