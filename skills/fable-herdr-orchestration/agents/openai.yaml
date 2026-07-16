@@ -1,0 +1,4 @@
+interface:
+  display_name: "Fable Herdr Orchestration"
+  short_description: "Route Fable and Codex workers through Herdr"
+  default_prompt: "Use $fable-herdr-orchestration to orchestrate this task through Herdr."
