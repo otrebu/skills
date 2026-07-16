@@ -34,10 +34,10 @@ Start workers interactively in Herdr panes:
 
 ```bash
 # Default Codex worker
-codex -m gpt-5.6-sol -c 'model_reasoning_effort="xhigh"' --dangerously-bypass-approvals-and-sandbox
+codex -m gpt-5.6-sol --sandbox workspace-write --ask-for-approval on-request -c 'model_reasoning_effort="xhigh"' -c 'approvals_reviewer="auto_review"'
 
 # Hardest Codex work
-codex -m gpt-5.6-sol -c 'model_reasoning_effort="max"' --dangerously-bypass-approvals-and-sandbox
+codex -m gpt-5.6-sol --sandbox workspace-write --ask-for-approval on-request -c 'model_reasoning_effort="max"' -c 'approvals_reviewer="auto_review"'
 
 # Additional Fable worker
 claude --model fable --effort xhigh --dangerously-skip-permissions
@@ -46,7 +46,9 @@ claude --model fable --effort xhigh --dangerously-skip-permissions
 claude --model fable --effort max --dangerously-skip-permissions
 ```
 
-These commands remove approval prompts. Use them only in directories the user has entrusted to autonomous work.
+For Codex, `-c key=value` overrides one config value for that worker without changing global config. Values are parsed as TOML, so string values retain their inner quotes.
+
+Codex stays inside `workspace-write`; eligible boundary requests go to automatic approval review. Fable workers skip permission checks, so use them only in directories the user has entrusted to autonomous work.
 
 ## Dispatch loop
 
