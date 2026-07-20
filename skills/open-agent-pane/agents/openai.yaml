@@ -1,7 +1,0 @@
-interface:
-  display_name: "Open Agent Pane"
-  short_description: "Brief a specialist in a new Herdr pane"
-  default_prompt: "Use $open-agent-pane to ask Claude for a second opinion on the current approach."
-
-policy:
-  allow_implicit_invocation: false

@@ -1,10 +1,10 @@
 ---
-name: open-agent-pane
-description: Open a right-hand Herdr pane and brief a chosen coding agent from a conversation snapshot.
+name: handoff-that-to-agent-pane
+description: Hand off a bounded task to a chosen coding agent in a right-hand Herdr pane using a conversation snapshot.
 disable-model-invocation: true
 ---
 
-# Open Agent Pane
+# Handoff That to Agent Pane
 
 Treat the handoff as a **brief**: give the specialist the relevant context, a bounded assignment, and a checkable deliverable.
 

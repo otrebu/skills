@@ -1,0 +1,7 @@
+interface:
+  display_name: "Handoff That to Agent Pane"
+  short_description: "Hand off work to a new Herdr agent pane"
+  default_prompt: "Use $handoff-that-to-agent-pane to hand this work to Claude for a second opinion."
+
+policy:
+  allow_implicit_invocation: false
