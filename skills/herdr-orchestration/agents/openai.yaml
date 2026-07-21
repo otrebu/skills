@@ -1,0 +1,6 @@
+interface:
+  display_name: "Herdr Orchestration"
+  short_description: "Orchestrate agent workers from any Herdr host"
+  default_prompt: "Use $herdr-orchestration to decompose this task, route workers in Herdr, and integrate the result."
+policy:
+  allow_implicit_invocation: false
