@@ -16,6 +16,12 @@ If the current session was not launched this way, give the command to the user a
 
 Load and follow the `herdr` skill before issuing Herdr commands. Continue only when `HERDR_ENV=1`.
 
+## Herdr topology
+
+Keep the control tower and every worker in the current Herdr workspace. Leave the current Fable pane in its existing control-tower tab. Create worker tabs in that workspace and group related workstreams in the same tab; reuse a matching tab while it has capacity, and open another clearly named tab when it does not. Each worker tab may contain at most four panes.
+
+Give every worker tab and pane a concise role label, keep focus in the control-tower pane during background work, and record the IDs of every tab and pane created during the run. Those IDs define the resources eligible for cleanup.
+
 ## Model routing
 
 | Agent | Assign |
@@ -53,9 +59,13 @@ Codex stays inside `workspace-write`; eligible boundary requests go to automatic
 ## Dispatch loop
 
 1. Decompose the task into independent, verifiable workstreams. Give each workstream one owner; serialize work that may edit the same files or depends on unfinished output.
-2. Use Herdr to create sibling panes without stealing focus. Launch the routed agent, wait until it is idle, then send a prompt containing the objective, scope, deliverable, and verification requirement.
+2. Place each worker in the appropriate worker tab under the topology rules above without stealing focus. Launch the routed agent, wait until it is idle, then send a prompt containing the objective, scope, deliverable, and verification requirement.
 3. Monitor every worker through Herdr. Inspect current state and output before waiting; surface blocked decisions to the user instead of answering them silently.
 4. Integrate completed output in the control tower. Escalate unexpectedly difficult or stalled work to `max`, choosing Codex for isolated execution and Fable for cross-cutting reasoning.
 5. Run relevant verification and perform the final integrated review in Fable. Use an independent `max` reviewer when the result is high-risk or unusually difficult.
 
-Finish only when every workstream is completed or explicitly dropped, all accepted output is integrated, verification has passed, and Fable has reviewed the whole result.
+## Completion and cleanup
+
+The work is definitely done only when every workstream is completed or explicitly dropped, all accepted output is integrated, verification has passed, and Fable has reviewed the whole result.
+
+Once that gate passes, tell the user the work is done and ask whether to close the worker panes and tabs created for this run. Leave them open until the user confirms. If confirmed, close only the recorded resources, preserving the current workspace and Fable control-tower pane.
