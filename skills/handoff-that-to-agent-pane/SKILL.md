@@ -30,7 +30,7 @@ Ask once before mutating anything only when the assignment cannot be inferred sa
 | `claude` | Fable, xhigh effort | `claude --model fable --effort xhigh --dangerously-skip-permissions` |
 | `codex` | GPT-5.6 Sol, xhigh thinking | `codex -m gpt-5.6-sol --sandbox workspace-write --ask-for-approval on-request -c 'model_reasoning_effort="xhigh"' -c 'approvals_reviewer="auto_review"'` |
 | `agent` | Grok 4.5, xhigh effort | `agent --model <resolved-model-id> --yolo --sandbox disabled` |
-| `pi` | Kimi K3, max thinking | `pi --approve --provider kimi-coding --model k3 --thinking max` |
+| `pi` | Kimi K3-256k, max thinking | `pi --approve --provider kimi-coding --model k3-256k --thinking max` |
 
 Use the Codex command verbatim: `on-request` plus `approvals_reviewer="auto_review"` sends eligible escalation requests through automatic review while retaining `workspace-write` sandboxing.
 
@@ -42,7 +42,7 @@ codex -m gpt-5.6-sol --sandbox workspace-write --ask-for-approval on-request -c 
 
 Treat `xhigh` and `extra high` as xhigh reasoning. Use another literal Codex model ID only when the user supplies the exact ID explicitly. Never manufacture an ID from prose.
 
-Before splitting, resolve the account-specific Cursor model ID and confirm that pi exposes Kimi K3:
+Before splitting, resolve the account-specific Cursor model ID and confirm that pi exposes Kimi K3-256k:
 
 ```bash
 agent --list-models
@@ -50,7 +50,9 @@ pi --version
 pi --list-models k3
 ```
 
-For the Cursor default, require an exact Grok 4.5 xhigh match and place its listed ID in the launch command; never pass `<resolved-model-id>` literally. For pi's K3 default, require version 0.80.10 or later, configured Kimi Code access, and the exact `kimi-coding/k3` entry. Pi has no per-tool approval mode: its built-in read, bash, edit, and write tools are enabled by default, while `--approve` only trusts project-local resources. If K3 is absent, report the failed precondition and never silently use K2.7. If any requested default is unavailable, stop before creating the pane and substitute only with the user's approval.
+`pi --list-models k3` currently surfaces `kimi-coding/k3` (1.0M context), `kimi-coding/k3-256k` (262.1K context), and `openai-codex/gpt-5.3-codex-spark`. Our pi default is **`kimi-coding/k3-256k`**.
+
+For the Cursor default, require an exact Grok 4.5 xhigh match and place its listed ID in the launch command; never pass `<resolved-model-id>` literally. For pi's default, require version 0.80.10 or later, configured Kimi Code access, and the exact `kimi-coding/k3-256k` entry. Pi has no per-tool approval mode: its built-in read, bash, edit, and write tools are enabled by default, while `--approve` only trusts project-local resources. If `k3-256k` is absent, report the failed precondition and never silently use `k3`, K2.7, or another listed model. If any requested default is unavailable, stop before creating the pane and substitute only with the user's approval.
 
 Keep the launch interactive and preserve the current working directory. Run Claude with permission checks bypassed, Cursor Agent with YOLO and its sandbox disabled, and pi with its default unrestricted built-in tools. Keep Codex on the shown automatic approval-review setup. Honor an explicit permission override from the user.
 
