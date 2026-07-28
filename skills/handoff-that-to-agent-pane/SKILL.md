@@ -1,7 +1,6 @@
 ---
 name: handoff-that-to-agent-pane
 description: Hand off a bounded task to a chosen coding agent in a right-hand Herdr pane using a conversation snapshot.
-disable-model-invocation: true
 ---
 
 # Handoff That to Agent Pane
@@ -29,7 +28,7 @@ Ask once before mutating anything only when the assignment cannot be inferred sa
 |---|---|---|
 | `claude` | Fable, xhigh effort | `claude --model fable --effort xhigh --dangerously-skip-permissions` |
 | `codex` | GPT-5.6 Sol, xhigh thinking | `codex -m gpt-5.6-sol --sandbox workspace-write --ask-for-approval on-request -c 'model_reasoning_effort="xhigh"' -c 'approvals_reviewer="auto_review"'` |
-| `agent` | Grok 4.5, xhigh effort | `agent --model <resolved-model-id> --yolo --sandbox disabled` |
+| `agent` | Grok 4.5 High Fast | `agent --model cursor-grok-4.5-high-fast --yolo --sandbox disabled` |
 | `pi` | Kimi K3-256k, max thinking | `pi --approve --provider kimi-coding --model k3-256k --thinking max` |
 
 Use the Codex command verbatim: `on-request` plus `approvals_reviewer="auto_review"` sends eligible escalation requests through automatic review while retaining `workspace-write` sandboxing.
@@ -42,7 +41,15 @@ codex -m gpt-5.6-sol --sandbox workspace-write --ask-for-approval on-request -c 
 
 Treat `xhigh` and `extra high` as xhigh reasoning. Use another literal Codex model ID only when the user supplies the exact ID explicitly. Never manufacture an ID from prose.
 
-Before splitting, resolve the account-specific Cursor model ID and confirm that pi exposes Kimi K3-256k:
+For Cursor Agent, use this exact command when the user asks for Grok 4.5 High Fast or does not override the `agent` default:
+
+```bash
+agent --model cursor-grok-4.5-high-fast --yolo --sandbox disabled
+```
+
+Grok 4.5 has `low`, `medium`, and `high` variants in the current account, each with a `fast` variant; it does not have an `xhigh` tier. Treat “Grok 4.5 high fast” as the literal model ID `cursor-grok-4.5-high-fast`. Treat an explicit “Grok 4.5 high” without “fast” as `cursor-grok-4.5-high`. Do not infer any other Cursor model ID from prose.
+
+Before splitting, confirm that Cursor exposes the selected literal model ID and that pi exposes Kimi K3-256k:
 
 ```bash
 agent --list-models
@@ -52,7 +59,7 @@ pi --list-models k3
 
 `pi --list-models k3` currently surfaces `kimi-coding/k3` (1.0M context), `kimi-coding/k3-256k` (262.1K context), and `openai-codex/gpt-5.3-codex-spark`. Our pi default is **`kimi-coding/k3-256k`**.
 
-For the Cursor default, require an exact Grok 4.5 xhigh match and place its listed ID in the launch command; never pass `<resolved-model-id>` literally. For pi's default, require version 0.80.10 or later, configured Kimi Code access, and the exact `kimi-coding/k3-256k` entry. Pi has no per-tool approval mode: its built-in read, bash, edit, and write tools are enabled by default, while `--approve` only trusts project-local resources. If `k3-256k` is absent, report the failed precondition and never silently use `k3`, K2.7, or another listed model. If any requested default is unavailable, stop before creating the pane and substitute only with the user's approval.
+For the Cursor default, require the exact `cursor-grok-4.5-high-fast` entry. If it is absent, report the failed precondition; never silently fall back to the non-fast variant or another Grok tier. For pi's default, require version 0.80.10 or later, configured Kimi Code access, and the exact `kimi-coding/k3-256k` entry. Pi has no per-tool approval mode: its built-in read, bash, edit, and write tools are enabled by default, while `--approve` only trusts project-local resources. If `k3-256k` is absent, report the failed precondition and never silently use `k3`, K2.7, or another listed model. If any requested default is unavailable, stop before creating the pane and substitute only with the user's approval.
 
 Keep the launch interactive and preserve the current working directory. Run Claude with permission checks bypassed, Cursor Agent with YOLO and its sandbox disabled, and pi with its default unrestricted built-in tools. Keep Codex on the shown automatic approval-review setup. Honor an explicit permission override from the user.
 
