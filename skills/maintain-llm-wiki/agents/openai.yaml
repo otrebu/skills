@@ -1,0 +1,4 @@
+interface:
+  display_name: "Maintain LLM Wiki"
+  short_description: "Build and maintain a compounding markdown wiki"
+  default_prompt: "Use $maintain-llm-wiki to ingest these sources into my persistent wiki."
