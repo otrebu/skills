@@ -14,7 +14,7 @@ Load and follow the `herdr` skill before issuing Herdr commands. Continue only w
 
 Keep the control tower and every worker in the current Herdr workspace. Leave the control-tower pane in its existing tab. Create worker tabs in that workspace, group related workstreams in the same tab, and cap each worker tab at four panes. Reuse a matching tab while it has capacity; otherwise create another clearly named tab.
 
-Give every worker tab and pane a concise role label. Preserve focus in the control-tower pane during background work. Record every tab and pane ID created during the run; this ledger defines the resources eligible for cleanup.
+Give every worker tab and pane a concise role label. Preserve focus in the control-tower pane during background work. Record every tab and pane ID created during the run; this ledger defines the resources eligible for cleanup. Moving a pane between workspaces changes its ID, so re-read the response and update the ledger after any move.
 
 ## Capability routing
 
@@ -41,4 +41,6 @@ Launch workers interactively with the normal executable specified by the `herdr`
 
 The work is done only when every workstream is completed or explicitly dropped, all accepted output is integrated, verification has passed, and the host has reviewed the whole result.
 
-After that gate passes, tell the user the work is done and ask whether to close the worker panes and tabs created for this run. Leave them open until the user confirms. On confirmation, close only the resources in the ledger, preserving the current workspace and control-tower pane.
+Report the outcome when the run ends, whether or not the gate passed, and keep the workers open while the session continues so their transcripts stay readable.
+
+When wrapping up the session, propose closing the run's workers. Once the user agrees, close each ledger entry that Herdr still reports as the labelled worker this run created, and report anything you skipped. Entries missing from the ledger stay open for the user to close.
