@@ -6,9 +6,9 @@ disable-model-invocation: true
 
 # Fable Herdr Orchestration
 
-Read `~/.agents/skills/herdr-orchestration/SKILL.md` and follow it for topology, the dispatch loop, and completion and cleanup; it sets `disable-model-invocation`, so reach it by file rather than through the skill tool.
+Read `~/.agents/skills/herdr-orchestration/SKILL.md` and follow all of it, including worker agent, worker permissions, topology, the dispatch loop, and completion and cleanup; it sets `disable-model-invocation`, so reach it by file rather than through the skill tool. If that path does not exist, try `../herdr-orchestration/SKILL.md` relative to this file. If neither resolves, say that the orchestration layer is not installed and stop; do not proceed on this file alone.
 
-This skill binds that one to Fable and Codex. Where the two disagree, this skill wins.
+This skill binds that one to Fable and Codex, exercising its "a binding skill pins one" exception: the worker CLI is pinned per role in the table below and does not track the host agent. The sections below override that skill only where they conflict; everything it says otherwise still applies, including its requirement to state the resolved agent in the first status report; state each role's model and effort there too, since this skill pins them.
 
 ## Control tower
 
@@ -18,7 +18,7 @@ Treat the current Fable session as the control tower. Run it from a trusted dire
 claude --model fable --effort xhigh --dangerously-skip-permissions
 ```
 
-If the current session was not launched this way, give the command to the user and stop.
+`herdr pane current --current` reports the agent kind but not the model, so read this session's own launch line with `ps -o command= -p $PPID` and confirm it carries `--model fable`. If it does not, give the command above to the user and stop. If the launch line cannot be read at all, say so and ask the user to confirm before dispatching anything.
 
 ## Role binding
 
@@ -31,18 +31,20 @@ Bind the capability roles from `herdr-orchestration` to these agents:
 | **Specialist worker** | Fable, xhigh, for architecture or synthesis that benefits from a second Fable perspective. |
 | **Maximum worker** | Codex GPT-5.6, max for the hardest isolated implementation, debugging, or adversarial review; Fable, max for the hardest cross-cutting reasoning, recovery from stalled work, or an independent final review. |
 
+The `-m` values in the launch commands below are literal model ids, not display names: "Codex GPT-5.6" is `gpt-5.6-sol`.
+
 Start uncertain work at `xhigh`. Reserve `max` for work whose observed difficulty or stakes justify its cost. When escalating, choose Codex for isolated execution and Fable for cross-cutting reasoning.
 
 ## Launch commands
 
-Start workers interactively in Herdr panes:
+Start workers with `herdr agent start <name> --kind <kind> --pane <pane-id> -- <agent-args>`. `--kind` selects the executable, so pass each command below without its leading executable name as the arguments after `--`:
 
 ```bash
 # Default worker — Codex, xhigh
-codex -m gpt-5.6-sol --sandbox workspace-write --ask-for-approval on-request -c 'model_reasoning_effort="xhigh"' -c 'approvals_reviewer="auto_review"'
+codex -m gpt-5.6-sol --approve-for-me -c 'model_reasoning_effort="xhigh"'
 
 # Maximum worker — Codex, max
-codex -m gpt-5.6-sol --sandbox workspace-write --ask-for-approval on-request -c 'model_reasoning_effort="max"' -c 'approvals_reviewer="auto_review"'
+codex -m gpt-5.6-sol --approve-for-me -c 'model_reasoning_effort="max"'
 
 # Specialist worker — Fable, xhigh
 claude --model fable --effort xhigh --dangerously-skip-permissions
@@ -51,6 +53,12 @@ claude --model fable --effort xhigh --dangerously-skip-permissions
 claude --model fable --effort max --dangerously-skip-permissions
 ```
 
+A default Codex worker therefore starts as:
+
+```bash
+herdr agent start impl-1 --kind codex --pane <pane-id> -- -m gpt-5.6-sol --approve-for-me -c 'model_reasoning_effort="xhigh"'
+```
+
 For Codex, `-c key=value` overrides one config value for that worker without changing global config. Values are parsed as TOML, so string values retain their inner quotes.
 
-Codex stays inside `workspace-write`; eligible boundary requests go to automatic approval review. Fable workers skip permission checks, so use them only in directories the user has entrusted to autonomous work.
+The permission and sandbox flags in these commands come verbatim from the launch matrix at `~/.agents/skills/herdr-orchestration/references/agent-launch.md`; that file, not this one, defines what they do. The model and effort flags are this binding's own.

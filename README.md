@@ -23,6 +23,8 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 
 ## Install from GitHub
 
+The Herdr-family skills (`herdr-orchestration`, `handoff-that-to-agent-pane`, `fable-herdr-orchestration`) require the separate `herdr` skill, which is not in this repo — install it from its upstream, [`herdrdev/herdr`](https://github.com/herdrdev/herdr).
+
 Install everything in this repo into `~/.agents/skills/` for every detected agent:
 
 ```bash
