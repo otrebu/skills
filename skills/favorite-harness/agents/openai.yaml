@@ -1,0 +1,6 @@
+interface:
+  display_name: "Favorite Harness"
+  short_description: "Look up harness, model, and effort per job"
+  default_prompt: "Use $favorite-harness to choose the harness, model, and effort for this work."
+policy:
+  allow_implicit_invocation: true
