@@ -1,0 +1,6 @@
+interface:
+  display_name: "Theory vs Reality"
+  short_description: "Audit a plan against the built implementation"
+  default_prompt: "Use $theory-vs-reality to audit this plan against the implementation."
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Fable Orchestration"
+  short_description: "Let Fable 5.1 orchestrate ultracode and subagents"
+  default_prompt: "Use $fable-orchestration to choose how to combine ultracode and subagents for this task."
+policy:
+  allow_implicit_invocation: false

@@ -1,0 +1,6 @@
+interface:
+  display_name: "Tmp Snapshot"
+  short_description: "Save a conversation slice to a /tmp markdown file"
+  default_prompt: "Use $tmp-snapshot to save this conversation slice to /tmp."
+policy:
+  allow_implicit_invocation: false

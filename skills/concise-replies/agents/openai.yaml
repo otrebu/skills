@@ -1,0 +1,6 @@
+interface:
+  display_name: "Concise Replies"
+  short_description: "Make every reply the smallest complete answer"
+  default_prompt: "Use $concise-replies to shape this session's replies."
+policy:
+  allow_implicit_invocation: false

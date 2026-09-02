@@ -1,0 +1,6 @@
+interface:
+  display_name: "Structured Replies"
+  short_description: "Shape replies as simple or headline-led complex"
+  default_prompt: "Use $structured-replies to shape this session's replies."
+policy:
+  allow_implicit_invocation: false
