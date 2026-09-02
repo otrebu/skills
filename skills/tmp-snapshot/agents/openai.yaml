@@ -3,4 +3,4 @@ interface:
   short_description: "Save a conversation slice to a /tmp markdown file"
   default_prompt: "Use $tmp-snapshot to save this conversation slice to /tmp."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

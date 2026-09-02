@@ -3,4 +3,4 @@ interface:
   short_description: "Publish an HTML artifact tree to ubuilt.dev"
   default_prompt: "Use $publish-artifacts to publish this folder to ubuilt.dev."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

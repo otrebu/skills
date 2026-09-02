@@ -1,7 +1,6 @@
 ---
 name: work-tree-canvas
 description: Maintain a persistent visual work tree in an Obsidian Canvas as you (and the agents you're driving) branch into sub-problems, decisions, and dead ends across sessions. Resolves which canvas to use per project, tracks a small active set (1–3 nodes you're working on now — the 👉 primary is the attach anchor), and keeps the layout tidy. Use when the user says "add to the tree/canvas", "branch off X", "focus on Y", "also working on Z", "mark X active", "done with X", "new topic X", "close / finish the X topic", "tidy the tree", "where was I", "what was I doing", "I lost my place", or otherwise wants to capture / navigate the shape of an ongoing investigation.
-disable-model-invocation: true
 ---
 
 # work-tree-canvas

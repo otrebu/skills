@@ -3,4 +3,4 @@ interface:
   short_description: "Maintain a persistent Obsidian work-tree canvas"
   default_prompt: "Use $work-tree-canvas to capture this work on the tree."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true

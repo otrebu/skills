@@ -3,4 +3,4 @@ interface:
   short_description: "Review a list of items one at a time"
   default_prompt: "Use $walkthrough to step through these items one at a time."
 policy:
-  allow_implicit_invocation: false
+  allow_implicit_invocation: true
