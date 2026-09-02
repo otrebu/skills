@@ -9,7 +9,7 @@ This skill selects defaults; it does not orchestrate or launch by itself. Match 
 
 | Job | Harness | Model | Effort |
 |---|---|---|---|
-| Orchestration, final review, security review | Claude | Fable 5 | xhigh |
+| Orchestration, final review, security review | Claude | Fable 5.1 | xhigh |
 | Implementation | Codex | GPT-5.6 Sol | high; xhigh only if stuck |
 | Tests, retrieval, checking, creating issues | Cursor Agent | Grok 4.6 | high; medium if mechanical |
 | Anything that is not tool/repo work | Kimi Code CLI | K3 | max |

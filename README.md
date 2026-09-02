@@ -10,7 +10,7 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 |---|---|
 | [`concise-replies`](./skills/concise-replies) | Shapes every reply to be the smallest complete answer: right-size to the question, gate a leading index behind ~4+ sections, draw an ASCII diagram only when flow/order/architecture beats words, and correct false premises first. A tournament-tuned variant of `structured-replies` — enable one at a time. |
 | [`fable-herdr-orchestration`](./skills/fable-herdr-orchestration) | A Fable-specific binding of `herdr-orchestration` — requires a Fable control tower, binds the capability roles to Codex GPT-5.6 and Fable workers, and fixes the launch commands, escalating from xhigh to max for the hardest work. Install alongside `herdr-orchestration`. |
-| [`fable-orchestration`](./skills/fable-orchestration) | Lets Fable 5, xhigh choose how to combine ultracode with Fable, Opus, and Sonnet subagents, escalating to max only when needed. |
+| [`fable-orchestration`](./skills/fable-orchestration) | Lets Fable 5.1, xhigh choose how to combine ultracode with Fable, Opus, and Sonnet subagents, escalating to max only when needed. |
 | [`favorite-harness`](./skills/favorite-harness) | Pins which coding harness, model, and effort to use for a job, plus the yolo/autonomous launch command for each. |
 | [`handoff-that-to-agent-pane`](./skills/handoff-that-to-agent-pane) | Hands off a bounded task to Codex, Claude, Cursor Agent, or pi in a right-hand Herdr pane using a focused conversation snapshot. |
 | [`herdr-orchestration`](./skills/herdr-orchestration) | Uses any host agent as a Herdr control tower to route workers by capability, supervise integration, verify the result, and clean up only its own panes and tabs. |
