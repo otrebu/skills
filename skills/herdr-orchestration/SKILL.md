@@ -14,7 +14,14 @@ Load and follow the `herdr` skill before issuing Herdr commands. Continue only w
 
 The `herdr` skill governs command mechanics and safety. Where its defaults disagree with this skill — sibling-pane topology, no new tabs, or its `--wait`-at-prompt guidance — this skill wins: an orchestration run is an explicit request for this topology and this dispatch behavior.
 
-Keep the control tower and every worker in the current Herdr workspace. Leave the control-tower pane in its existing tab. Create worker tabs in that workspace, group related workstreams in the same tab, and cap each worker tab at four panes:
+Keep the control tower and every worker in the current Herdr workspace. Leave the control-tower pane in its existing tab. Rename that pane and that tab `orchestrator` before creating workers; do not create a new tab for the control tower, and do not add either ID to the cleanup ledger:
+
+```bash
+herdr pane rename "$HERDR_PANE_ID" orchestrator
+herdr tab rename "$HERDR_TAB_ID" orchestrator
+```
+
+Create worker tabs in that workspace, group related workstreams in the same tab, and cap each worker tab at four panes:
 
 ```bash
 herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label "<role>" --no-focus
