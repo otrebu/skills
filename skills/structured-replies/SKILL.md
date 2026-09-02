@@ -1,6 +1,7 @@
 ---
 name: structured-replies
 description: Shape every assistant reply. Simple questions → terse direct answer, freeform. Complex / multi-topic / process answers → open with headlines + one-line summaries, optionally an ASCII visual (diagram, mockup, table, flow) when order or layout matters, then short detail sections that each say what was understood, how it was done, and (when non-obvious) why. Use on every turn to keep replies scannable and aligned.
+disable-model-invocation: true
 ---
 
 # structured-replies

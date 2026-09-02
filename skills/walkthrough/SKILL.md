@@ -1,6 +1,7 @@
 ---
 name: walkthrough
 description: Present a list of items one at a time for focused, interactive review — each with enough context to act on, then wait for the user before advancing. Use when the user wants to step through items one at a time, or hands over findings / tasks / suggestions / a file of items to review interactively rather than as a wall of text.
+disable-model-invocation: true
 ---
 
 # walkthrough

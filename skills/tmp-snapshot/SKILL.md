@@ -1,6 +1,7 @@
 ---
 name: tmp-snapshot
 description: Save content from the current conversation to /tmp/<descriptive-kebab-name>.md, then return the absolute path and an outline (every header with a one-line summary). Use when the user says "save this to /tmp", "snapshot this", "dump the X part", "stash this", "save the discussion about Y", or otherwise asks to drop content from the chat into a quick scratch markdown file.
+disable-model-invocation: true
 ---
 
 # tmp-snapshot

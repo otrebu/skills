@@ -1,6 +1,7 @@
 ---
 name: theory-vs-reality
 description: Audit a plan vs an implementation. Build an interactive HTML checklist of end-user acceptance criteria, then spawn parallel agents to verify each item against the actual code. Use when validating whether a built feature matches its stated plan, stories, tasks, or subtasks — or when you need a copy/paste-friendly feedback artifact tied to the plan.
+disable-model-invocation: true
 ---
 
 # theory-vs-reality

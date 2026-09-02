@@ -1,6 +1,7 @@
 ---
 name: maintain-llm-wiki
 description: Maintain a compounding LLM wiki that integrates immutable sources into an interlinked, agent-owned knowledge base. Use when setting up a persistent markdown wiki, ingesting sources into it, answering or filing cited wiki queries, or linting the wiki for contradictions, staleness, gaps, and broken links.
+disable-model-invocation: true
 ---
 
 # Maintain LLM Wiki

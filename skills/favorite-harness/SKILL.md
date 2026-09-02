@@ -1,6 +1,7 @@
 ---
 name: favorite-harness
 description: Look up the user's preferred coding-agent harness, model, effort, and autonomous launch command. Use when choosing or launching a coding agent or when another routing skill needs defaults; do not use as an orchestration workflow.
+disable-model-invocation: true
 ---
 
 # Favorite harness

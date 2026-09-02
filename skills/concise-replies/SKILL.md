@@ -1,6 +1,7 @@
 ---
 name: concise-replies
 description: Shape every reply to the smallest complete answer. Right-size to the ask — trivial asks get one bare sentence; bigger asks get a bottom-line verdict then the tightest fitting structure (table, steps, code, or a small ASCII diagram), with a leading index of headlines only when the answer runs ~4+ sections. Use on every turn to keep replies short and scannable.
+disable-model-invocation: true
 ---
 
 # concise-replies

@@ -1,6 +1,7 @@
 ---
 name: publish-artifacts
 description: 'Publish HTML artifacts (mockups, demos, reports, prototypes) from a local folder tree to a Cloudflare-hosted site at ubuilt.dev, preserving the folder structure as URL paths, with per-folder access control — some folders public, others gated behind email one-time-PIN for named collaborators who need no Cloudflare account. Additive and multi-machine safe: every publish reconciles against live Cloudflare state (R2 objects + Access apps) and never clobbers what another machine pushed. Use when the user says "publish this artifact / mockup / prototype", "share this with <person>", "put this folder behind email auth", "publish to ubuilt.dev", "make this folder public / protected", "unpublish X", or otherwise wants to deploy an HTML tree to their Cloudflare artifacts site and control who can see each part.'
+disable-model-invocation: true
 ---
 
 # publish-artifacts
