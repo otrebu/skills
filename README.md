@@ -22,6 +22,7 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 | [`tmp-snapshot`](./skills/tmp-snapshot) | Saves slices of the current conversation to `/tmp/<name>.md` and returns the path plus an outline of every header. |
 | [`walkthrough`](./skills/walkthrough) | Presents a list — findings, tasks, options, or a file of items — one at a time for focused interactive review, with `next / back / discuss / edit / skip / goto / find / list / done` controls and a running progress header. |
 | [`work-tree-canvas`](./skills/work-tree-canvas) | Maintains a persistent Obsidian Canvas of your work tree across sessions — adds nodes for new branches, tracks the current 🎯 focus, keeps the layout tidy. |
+| [`write-simply`](./skills/write-simply) | Prefers the literal phrase over metaphor and flourish. |
 
 ## Install from GitHub
 

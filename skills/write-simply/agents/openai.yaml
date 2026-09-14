@@ -1,0 +1,6 @@
+interface:
+  display_name: "Write Simply"
+  short_description: "Prefer the literal phrase whenever one is available"
+  default_prompt: "Use $write-simply to write this session's prose."
+policy:
+  allow_implicit_invocation: false
