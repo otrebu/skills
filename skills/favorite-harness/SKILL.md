@@ -11,25 +11,29 @@ This skill selects defaults; it does not orchestrate or launch by itself. Match 
 |---|---|---|---|
 | Orchestration, final review, security review | Claude | Fable 5.1 | xhigh |
 | Implementation | Codex | GPT-5.6 Sol | high; xhigh only if stuck |
-| Tests, retrieval, checking, creating issues | Cursor Agent | Grok 4.6 Fast | high; medium if mechanical |
+| Tests, retrieval, checking, creating issues | Cursor Agent | Grok 4.6 | high; medium if mechanical |
+| Observation (an `auto-improve` observer, polling a transcript for hours) | Claude | Fable 5.1 | high; Cursor Agent Grok 4.6 high once its spend runs high |
 | Anything that is not tool/repo work | Kimi Code CLI | K3 | max |
 
 ```bash
 # Claude — Fable xhigh
 claude --model fable --effort xhigh --dangerously-skip-permissions
 
+# Claude — Fable high (observers)
+claude --model fable --effort high --dangerously-skip-permissions
+
 # Codex — Sol high (stuck → xhigh)
 codex -m gpt-5.6-sol --approve-for-me -c 'model_reasoning_effort="high"'
 codex -m gpt-5.6-sol --approve-for-me -c 'model_reasoning_effort="xhigh"'
 
-# Cursor Agent — Grok 4.6 high fast (mechanical → medium fast)
-agent --model cursor-grok-4.6-high-fast --yolo --sandbox disabled
-agent --model cursor-grok-4.6-medium-fast --yolo --sandbox disabled
+# Cursor Agent — Grok 4.6 high (mechanical → medium); never a *-fast variant
+agent --model cursor-grok-4.6-high --yolo --sandbox disabled
+agent --model cursor-grok-4.6-medium --yolo --sandbox disabled
 
 # Kimi Code CLI — K3 max. No launch-time effort flag; send /effort max once idle.
 kimi -m k3 --yolo
 ```
 
-In Herdr, `--kind` is `claude` / `codex` / `cursor` / `kimi`. Pass everything after the executable after `--`.
+In Herdr, `--kind` is `claude` / `codex` / `cursor` / `kimi`. Pass everything after the executable after `--`. See `herdr-orchestration` for the refused-launch fallback.
 
 Never pin Fable max, Sol max, or Grok xhigh. Do not put Kimi on a tool loop. Do not use Opus unless the user asks.
