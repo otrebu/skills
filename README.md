@@ -8,6 +8,7 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 
 | Skill | What it does |
 |---|---|
+| [`check-in-later`](./skills/check-in-later) | Parks a run until a wall-clock time or a named condition, records the wake and the next step, and resumes it later: in-session when the wait is minutes, from a new session when it is hours. |
 | [`concise-replies`](./skills/concise-replies) | Shapes every reply to be the smallest complete answer: right-size to the question, gate a leading index behind ~4+ sections, draw an ASCII diagram only when flow/order/architecture beats words, and correct false premises first. A tournament-tuned variant of `structured-replies` — enable one at a time. |
 | [`create-browser-workflow-skill`](./skills/create-browser-workflow-skill) | Builds a skill that operates one web application through the agent-browser CLI: persistent, verified login; application knowledge captured as intent and expected state; optional Recorder or Puppeteer replay behind a reference. |
 | [`fable-herdr-orchestration`](./skills/fable-herdr-orchestration) | A Fable-specific binding of `herdr-orchestration` — requires a Fable control tower, binds the capability roles to Codex GPT-5.6 and Fable workers, and fixes the launch commands, escalating from xhigh to max for the hardest work. Install alongside `herdr-orchestration`. |

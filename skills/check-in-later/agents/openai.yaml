@@ -1,0 +1,6 @@
+interface:
+  display_name: "Check In Later"
+  short_description: "Park until a time or condition, then resume the next step"
+  default_prompt: "Use $check-in-later to park until the change window opens, then resume the next step."
+policy:
+  allow_implicit_invocation: true
