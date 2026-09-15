@@ -9,6 +9,7 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 | Skill | What it does |
 |---|---|
 | [`concise-replies`](./skills/concise-replies) | Shapes every reply to be the smallest complete answer: right-size to the question, gate a leading index behind ~4+ sections, draw an ASCII diagram only when flow/order/architecture beats words, and correct false premises first. A tournament-tuned variant of `structured-replies` — enable one at a time. |
+| [`create-browser-workflow-skill`](./skills/create-browser-workflow-skill) | Builds a skill that operates one web application through the agent-browser CLI: persistent, verified login; application knowledge captured as intent and expected state; optional Recorder or Puppeteer replay behind a reference. |
 | [`fable-herdr-orchestration`](./skills/fable-herdr-orchestration) | A Fable-specific binding of `herdr-orchestration` — requires a Fable control tower, binds the capability roles to Codex GPT-5.6 and Fable workers, and fixes the launch commands, escalating from xhigh to max for the hardest work. Install alongside `herdr-orchestration`. |
 | [`fable-orchestration`](./skills/fable-orchestration) | Lets Fable 5.1, xhigh choose how to combine ultracode with Fable, Opus, and Sonnet subagents, escalating to max only when needed. |
 | [`favorite-harness`](./skills/favorite-harness) | Pins which coding harness, model, and effort to use for a job, plus the yolo/autonomous launch command for each. |
