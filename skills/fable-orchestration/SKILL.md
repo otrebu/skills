@@ -14,8 +14,8 @@ Enable ultracode. Fable 5.1, xhigh chooses the orchestration and may adapt it as
 |---|---|
 | **Fable 5.1, xhigh** | Orchestration, demanding reasoning, difficult debugging, recovery, and final review. |
 | **Fable 5.1, max** | Exceptional escalation when xhigh is insufficient. |
-| **Opus 5, extra high** | Difficult implementation and adversarial review. |
-| **Opus 5, high** | Ordinary implementation, research, and intermediate review. |
+| **Opus 5.5, high** | Difficult implementation and adversarial review. |
+| **Opus 5.5, medium** | Ordinary implementation, research, and intermediate review. |
 | **Sonnet 5** | Only mechanical, extremely obvious work, or execution from a specification detailed enough that error is nearly impossible. |
 
 ## Execution

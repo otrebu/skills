@@ -27,28 +27,28 @@ Ask once before mutating anything only when the assignment cannot be inferred sa
 
 | Agent | Default | Interactive launch command |
 |---|---|---|
-| `claude` | Fable, xhigh effort | `claude --model fable --effort xhigh --dangerously-skip-permissions` |
-| `codex` | GPT-5.6 Sol, xhigh thinking | `codex -m gpt-5.6-sol --approve-for-me -c 'model_reasoning_effort="xhigh"'` |
-| `agent` | Grok 4.6 Extra High Fast | `agent --model cursor-grok-4.6-xhigh-fast --yolo --sandbox disabled` |
+| `claude` | Opus 5.5, high effort | `claude --model opus --effort high --dangerously-skip-permissions` |
+| `codex` | GPT-6 Sol, xhigh thinking | `codex -m gpt-6-sol --approve-for-me -c 'model_reasoning_effort="xhigh"'` |
+| `agent` | Grok 4.6 High | `agent --model cursor-grok-4.6-high --yolo --sandbox disabled` |
 | `pi` | Kimi K3-256k, max thinking | `pi --approve --provider kimi-coding --model k3-256k --thinking max` |
 
 Each command above is complete and verbatim: it already embeds its agent's autonomous posture, so dispatch needs no extra permission or sandbox flags. The launch matrix (`~/.agents/skills/herdr-orchestration/references/agent-launch.md`) is the canonical explanation of those posture flags — including why the Codex command needs no separate `--sandbox` or `--ask-for-approval` flag and why pi's `--approve` is a trust flag, not a permission flag. Consult it instead of re-deriving flags; when it is not installed, the commands above still stand as written.
 
-Treat `GPT 5.6`, `GPT 5.6 Sol`, and `Codex 5.6` as the model ID `gpt-5.6-sol`. Treat `ultra`, `maximum`, and `max` as **max reasoning effort**, never as part of a model ID. Thus “GPT 5.6 ultra” means:
+Treat `GPT 6`, `GPT 6 Sol`, and `Sol` as the model ID `gpt-6-sol`, `Astra` as `gpt-6-astra`, and `Luna` as `gpt-6-luna`; treat an explicit `GPT 5.6`, `GPT 5.6 Sol`, or `Codex 5.6` as `gpt-5.6-sol`. Treat `ultra` as **ultra reasoning effort** (`model_reasoning_effort="ultra"`), which Sol and Astra support; Luna has no ultra, so report that rather than substitute another effort. Treat `maximum` and `max` as **max reasoning effort**. Efforts are never part of a model ID. Thus “GPT 6 ultra” means:
 
 ```bash
-codex -m gpt-5.6-sol --approve-for-me -c 'model_reasoning_effort="max"'
+codex -m gpt-6-sol --approve-for-me -c 'model_reasoning_effort="ultra"'
 ```
 
 Treat `xhigh` and `extra high` as xhigh reasoning. Use another literal Codex model ID only when the user supplies the exact ID explicitly. Never manufacture an ID from prose.
 
-For Cursor Agent, use this exact command when the user asks for Grok 4.6 Extra High Fast or does not override the `agent` default:
+For Cursor Agent, use this exact command when the user asks for Grok 4.6 High or does not override the `agent` default:
 
 ```bash
-agent --model cursor-grok-4.6-xhigh-fast --yolo --sandbox disabled
+agent --model cursor-grok-4.6-high --yolo --sandbox disabled
 ```
 
-Grok 4.6 exposes `low`, `medium`, `high`, and `xhigh`, each with a `-fast` twin; match on the ID rather than the label, since `cursor-grok-4.6-high` is labelled “Cursor Grok 4.6” and `cursor-grok-4.6-high-fast` is labelled “Cursor Grok 4.6 Fast”. Grok 4.5 exposes `low`, `medium`, and `high`, each with a `-fast` twin, and has no `xhigh`. Treat `xhigh` and “extra high” as the literal model ID `cursor-grok-4.6-xhigh-fast` when “fast” is requested, and `cursor-grok-4.6-xhigh` when it is not. Do not infer any other Cursor model ID from prose.
+Grok 4.6 exposes `low`, `medium`, `high`, and `xhigh`, each with a `-fast` twin; match on the ID rather than the label, since `cursor-grok-4.6-high` is labelled “Cursor Grok 4.6” and `cursor-grok-4.6-high-fast` is labelled “Cursor Grok 4.6 Fast”. Grok 4.5 exposes `low`, `medium`, and `high`, each with a `-fast` twin, and has no `xhigh`. Treat `xhigh` and “extra high” as the literal model ID `cursor-grok-4.6-xhigh-fast` when “fast” is requested, and `cursor-grok-4.6-xhigh` when it is not. Grok 4.7 IDs have no `cursor-` prefix: `grok-4.7-low`, `grok-4.7-medium`, `grok-4.7-high`, and `grok-4.7-xhigh`, each with a `-fast` twin. When the user asks for Grok 4.7, apply the same tier and “fast” rules to these IDs; with no tier named, use `grok-4.7-high`, mirroring the default. Do not infer any other Cursor model ID from prose.
 
 When the chosen agent is `agent` (Cursor Agent) or `pi`, confirm before splitting that the selected literal model ID is listed. Run only the check for the agent you are dispatching, and skip this block entirely for `claude` and `codex`, which expose no local model list:
 
@@ -60,7 +60,7 @@ pi --list-models k3
 
 `pi --list-models k3` currently surfaces `kimi-coding/k3` (1.0M context), `kimi-coding/k3-256k` (262.1K context), and `openai-codex/gpt-5.3-codex-spark`. Our pi default is **`kimi-coding/k3-256k`**.
 
-For the Cursor default, require the exact `cursor-grok-4.6-xhigh-fast` entry. If it is absent, report the failed precondition; never silently fall back to the non-fast variant, a lower Grok 4.6 tier, or Grok 4.5. For pi's default, require version 0.80.10 or later, configured Kimi Code access, and the exact `kimi-coding/k3-256k` entry. If `k3-256k` is absent, report the failed precondition and never silently use `k3`, K2.7, or another listed model. If any requested default is unavailable, stop before creating the pane and substitute only with the user's approval.
+For the Cursor default, require the exact `cursor-grok-4.6-high` entry. If it is absent, report the failed precondition; never silently fall back to a `-fast` variant, another Grok 4.6 tier, or Grok 4.5. For pi's default, require version 0.80.10 or later, configured Kimi Code access, and the exact `kimi-coding/k3-256k` entry. If `k3-256k` is absent, report the failed precondition and never silently use `k3`, K2.7, or another listed model. If any requested default is unavailable, stop before creating the pane and substitute only with the user's approval.
 
 Keep the launch interactive and preserve the current working directory. Run each agent in the autonomous posture its table command already carries, per the launch matrix. Honor an explicit permission override from the user.
 
@@ -81,7 +81,7 @@ Preflight with local, non-inference commands only: `command -v`, `--version`, `-
 
    ```bash
    herdr pane rename <returned-pane-id> "<short-label>"
-   herdr agent start <name> --kind claude --pane <returned-pane-id> -- --model fable --effort xhigh --dangerously-skip-permissions
+   herdr agent start <name> --kind claude --pane <returned-pane-id> -- --model opus --effort high --dangerously-skip-permissions
    ```
 
    `--kind` selects the executable, so everything after `--` is the remainder of the chosen command from the table above. `agent start` returns once Herdr detects the agent ready for input. If it returns `agent_not_ready`, the agent is blocked at a startup dialog such as a trust or permissions prompt: read it with `herdr agent read <name> --source visible --format ansi`, surface it to the user, and prompt only once the agent is idle. Use a few words for the pane label; the full brief goes in the prompt template below, not in the label. Agent names must be unique among all live agents, so derive a short kebab-case name from the assignment and check `herdr agent list` first; if `agent start` returns `agent_name_taken`, choose another name.
@@ -95,8 +95,9 @@ Preflight with local, non-inference commands only: `command -v`, `--version`, `-
    Delegation: <requested subagent strategy, or "decide as needed">
    Deliverable: <review, second opinion, implementation, investigation, or side-task result>
    Verification: <evidence or checks required>
+   Unconfirmed: mark anything you couldn't confirm, and say where you looked.
 
-   Treat this prompt as authoritative if it conflicts with the snapshot. Surface any blocker instead of expanding scope.
+   Treat this prompt as authoritative if it conflicts with the snapshot. Stop only for a blocker you can't resolve, and stay inside Scope.
    ```
 
 7. Confirm the agent moved to `working`. If it did not, inspect its status and transcript before reporting the failure.

@@ -14,7 +14,7 @@ Resolve `ORCH` to the absolute `orchestrate.sh` adjacent to the `SKILL.md` that 
 
 - Launch full-auto workers only in directories the user has entrusted to autonomous edits and commands.
 - Record the active `ORCH_HOME` and choose a unique run prefix. Start every worker ID with that prefix so concurrent control towers sharing the state directory cannot collide.
-- Record each worker's ID, directory, workstream, and latest state. Pass explicit ledger IDs to `waitall` and `stop`; reserve no-ID `waitall`, `stop --all`, and `gc` for recovery after confirming the entire `ORCH_HOME` is in scope.
+- Record each worker's ID, directory, workstream, and latest state in a ledger file at `$ORCH_HOME/<run-prefix>-ledger.md`, rewritten on every change; after a context summary, read it back rather than trusting memory. Pass explicit ledger IDs to `waitall` and `stop`; reserve no-ID `waitall`, `stop --all`, and `gc` for recovery after confirming the entire `ORCH_HOME` is in scope.
 - Route human decisions to the user. Treat `--answer` as an assertion that the user chose the supplied response, and pass it only after receiving that choice.
 - Interpret `DONE` as a settled worker screen. Establish task completion separately by reading the logs, checking for trailing questions or unfinished plans, reviewing the result, and running verification.
 - Interpret `TIMEOUT` as a live worker that needs inspection or more time. Inspect with `poll` or `logs`, then wait again.
@@ -36,7 +36,7 @@ For two or more concurrent workers, read [references/fan-out.md](references/fan-
 
 3. **Dispatch and supervise.** Send a prompt containing the objective, scope, deliverable, verification requirement, coordination boundaries, and this human-input contract:
 
-   > If you need a human decision, print a line exactly: `>>> NEEDS_HUMAN: <your question>` and stop.
+   > If you need a human decision, print a line exactly: `>>> NEEDS_HUMAN: <your question>` and stop. Otherwise keep going until verification passes, with status notes in the same message as your next action.
 
    Use `run` for a single worker or a follow-up:
 
