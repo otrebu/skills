@@ -9,14 +9,16 @@ This skill selects defaults; it does not orchestrate or launch by itself. Match 
 
 | Job | Harness | Model | Effort |
 |---|---|---|---|
-| Orchestration, final review, security review | Claude | Opus 5.5 | high; Fable 5.1 xhigh for the hardest cross-cutting reasoning or a high-stakes security audit |
+| Orchestration | Claude | Opus 5.5 | xhigh |
+| Final review, security review | Claude | Opus 5.5 | high; Fable 5.1 xhigh for the hardest cross-cutting reasoning or a high-stakes security audit |
 | Implementation | Codex | GPT-6 Sol | high; stuck → xhigh; still stuck → GPT-6 Astra high |
 | Tests, retrieval, checking, creating issues | Cursor Agent | Grok 4.6 | high; medium if mechanical |
 | Observation (an `auto-improve` observer, polling a transcript for hours) | Claude | Opus 5.5 | medium; Cursor Agent Grok 4.6 high once its spend runs high |
 | Anything that is not tool/repo work | Kimi Code CLI | K3 | max |
 
 ```bash
-# Claude — Opus 5.5 high (orchestration, review); medium (observers)
+# Claude — Opus 5.5 xhigh (orchestration); high (review); medium (observers)
+claude --model opus --effort xhigh --dangerously-skip-permissions
 claude --model opus --effort high --dangerously-skip-permissions
 claude --model opus --effort medium --dangerously-skip-permissions
 
