@@ -1,0 +1,6 @@
+interface:
+  display_name: "Herdr Wrap-Up"
+  short_description: "Clean up after a multi-session Herdr run and report what was freed"
+  default_prompt: "Use $herdr-wrap-up to clean up now that this release is done: keep what can't be rebuilt or resumed, remove the rest, and report what was freed."
+policy:
+  allow_implicit_invocation: true
