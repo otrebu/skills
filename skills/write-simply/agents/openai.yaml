@@ -3,4 +3,4 @@ interface:
   short_description: "Write plain technical text with literal wording"
   default_prompt: "Use $write-simply to write plain technical prose and clear steps."
 policy:
-  allow_implicit_invocation: true
+  allow_implicit_invocation: false

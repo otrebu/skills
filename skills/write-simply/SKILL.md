@@ -1,11 +1,14 @@
 ---
 name: write-simply
 description: Write plain technical explanations, summaries, replies, reports and steps. Use when drafting text or replacing metaphor and flourish with literal wording.
+disable-model-invocation: true
 ---
 
 # write-simply
 
-When a literal phrase is available, use it. If a more precise literal wording names the same thing, use that wording.
+Mannered prose substitutes metaphor and flourish for direct statement. Instead of "a parameter worth varying," the mannered writer produces "a dial worth turning." Instead of "this point still matters," they write "this point earns its keep." The phrases exist to display the writer, not to convey the idea, and readers can tell. That is why mannered prose irritates: it makes the reader work harder so the writer can perform. It is also imprecise. Metaphors drag in connotations the writer did not choose and cannot control. The fix is to say what you mean. When a literal phrase is available, use it.
+
+If a more precise literal wording names the same thing, use that wording.
 
 A term you have defined is already the literal name. An ordinary word that started as metaphor (`deadline`, `bottleneck`) is already the literal name. Keep both.
 
