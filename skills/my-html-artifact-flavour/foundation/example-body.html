@@ -1,0 +1,42 @@
+<main class="wrap">
+<section class="overview" aria-label="Overview">
+<p class="eyebrow">Example report</p>
+<h1>Build health this week</h1>
+<p class="intro">Three pipelines ran 214 times. One job got slower, and one fix waits for review.</p>
+</section>
+
+<h2 class="section-label">Pipelines</h2>
+<div class="table-wrap"><table class="table">
+<thead><tr><th>Pipeline</th><th>Status</th><th class="num">Runs</th><th class="num">Median minutes</th></tr></thead>
+<tbody>
+<tr><td>Web app</td><td><span class="chip chip-low">Healthy</span></td><td class="num">121</td><td class="num">6.4</td></tr>
+<tr><td>API</td><td><span class="chip chip-med">Slower</span></td><td class="num">78</td><td class="num">11.9</td></tr>
+<tr><td>Docs site</td><td><span class="chip chip-high">Failing</span></td><td class="num">15</td><td class="num">2.1</td></tr>
+</tbody></table></div>
+
+<p class="callout"><strong>Why the API is slower.</strong> The integration job now starts a database for each test file.</p>
+
+<h2 class="section-label">Fix the docs site</h2>
+<p class="callout callout-warning"><strong>Before you start.</strong> The docs site publishes on every merge to main.</p>
+<ol class="procedure-list" style="margin-top:16px">
+<li class="procedure-item"><strong class="lead">Find the failing job.</strong><span class="instruction"> Open the last pipeline of the docs site.</span></li>
+<li class="procedure-item"><strong class="lead">Run the build locally.</strong>
+<pre data-copy="Command">npm ci
+npm run build -- --strict</pre></li>
+<li class="procedure-item"><strong class="lead">Check the result.</strong>
+<ol class="procedure-list substeps" type="a">
+<li class="procedure-item"><strong class="lead">Read the output.</strong><span class="instruction"> Look for a line that starts with <code>Broken link</code>.</span></li>
+<li class="procedure-item"><strong class="lead">Fix the link.</strong><span class="instruction"> Change the link in the file that the line names.</span></li>
+</ol></li>
+<li class="procedure-item"><strong class="lead">Put it back.</strong><span class="instruction"> If the change breaks the build, revert it.</span>
+<pre data-copy="Undo command" data-kind="undo">git revert --no-edit HEAD</pre></li>
+</ol>
+
+<details class="tools" data-persist style="margin-top:28px"><summary>How these numbers were counted</summary><div class="tool-body">
+<p>Runs count every pipeline on the main branch from Monday to Sunday. Median minutes count only finished runs.</p>
+</div></details>
+<details class="tools" data-persist><summary>Evidence limits</summary><div class="tool-body">
+<p>This report does not include pipelines on feature branches.</p>
+</div></details>
+<p class="footer">Theme: System follows your OS. <span class="tag">Example data only.</span></p>
+</main>

@@ -1,0 +1,50 @@
+[
+  {
+    "family": "ibm-plex-sans",
+    "weight": 400,
+    "file": "ibm-plex-sans-latin-400-normal.woff2",
+    "subset": "latin",
+    "package": "@fontsource/ibm-plex-sans",
+    "version": "5.3.0",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans/-/ibm-plex-sans-5.3.0.tgz",
+    "sha256": "3b646991d30055a93a4ecc499713d4347953a74a947ecab435ab72070cbdab0e",
+    "bytes": 22588,
+    "license": "ibm-plex-sans-OFL.txt"
+  },
+  {
+    "family": "ibm-plex-sans",
+    "weight": 600,
+    "file": "ibm-plex-sans-latin-600-normal.woff2",
+    "subset": "latin",
+    "package": "@fontsource/ibm-plex-sans",
+    "version": "5.3.0",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-sans/-/ibm-plex-sans-5.3.0.tgz",
+    "sha256": "8960851d691c054ed38e259bdcf1a6190d157b4203ed5bb32c632a863fb8ec2f",
+    "bytes": 24252,
+    "license": "ibm-plex-sans-OFL.txt"
+  },
+  {
+    "family": "ibm-plex-serif",
+    "weight": 400,
+    "file": "ibm-plex-serif-latin-400-normal.woff2",
+    "subset": "latin",
+    "package": "@fontsource/ibm-plex-serif",
+    "version": "5.3.0",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-serif/-/ibm-plex-serif-5.3.0.tgz",
+    "sha256": "cb2c5eee2c0a43ff30d2365407c7bc8b20e3bd90720a4a64102ba0b328022a02",
+    "bytes": 19580,
+    "license": "ibm-plex-serif-OFL.txt"
+  },
+  {
+    "family": "ibm-plex-mono",
+    "weight": 400,
+    "file": "ibm-plex-mono-latin-400-normal.woff2",
+    "subset": "latin",
+    "package": "@fontsource/ibm-plex-mono",
+    "version": "5.3.0",
+    "source": "https://registry.npmjs.org/@fontsource/ibm-plex-mono/-/ibm-plex-mono-5.3.0.tgz",
+    "sha256": "08949f728dc52d528e69b1667d15c89a5686a4ee9a296ff90983985f99c380f7",
+    "bytes": 14708,
+    "license": "ibm-plex-mono-OFL.txt"
+  }
+]

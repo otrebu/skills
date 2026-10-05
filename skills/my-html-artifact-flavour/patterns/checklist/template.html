@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'unsafe-inline'; style-src 'unsafe-inline'; img-src data:; font-src data:; connect-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="flavour-storage" content="__STORAGE_PREFIX__">
+<title>__GUIDE_TITLE__</title>
+<style>
+__GUIDE_FONTS__
+
+__FLAVOUR_CSS__
+
+/* Checklist pattern: index, areas, check cards, results and reference images. */
+.before{margin-top:27px;padding-block:18px;border-top:1px solid var(--line);border-bottom:1px solid var(--line)}.before h2{font-size:.85rem;margin-bottom:8px}.before ol{padding-left:1.4rem;font-size:.85rem;line-height:1.7}.before li+li{margin-top:3px}.before li::marker{color:var(--accent);font-weight:600}
+.index-head{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:30px 0 9px}.index-head small{color:var(--muted);font-size:.75rem}
+.legend{font-size:.78rem;color:var(--muted);margin-bottom:17px;line-height:1.9}.legend strong{color:var(--text)}.legend span{display:inline-block;margin-right:10px}
+.index{list-style:none;padding:0;border-top:1px solid var(--line)}.index li{border-bottom:1px solid var(--line)}
+.index-row{display:grid;grid-template-columns:10rem minmax(0,1fr) auto 2.5rem 1.4rem;align-items:center;gap:12px;width:100%;border:0;border-radius:0;padding:14px 8px;text-align:left;font-size:.83rem;line-height:1.45;transition:background .12s}
+.index-row strong{font-size:.91rem;text-decoration:underline;text-decoration-color:color-mix(in srgb,var(--accent) 35%,transparent);text-underline-offset:4px}.index-row:hover,.index-row:focus-visible{background:var(--soft)}.index-row:hover .index-arrow{transform:translateY(3px)}
+.hook{color:var(--muted)}.index-arrow{font-size:1.1rem;color:var(--accent);text-align:right;transition:transform .12s}.count{font-family:var(--mono);font-variant-numeric:tabular-nums;color:var(--muted);white-space:nowrap;font-size:.75rem;text-align:right}
+.fields{display:grid;gap:14px;margin-block:20px}.fields label{display:grid;gap:5px;font-size:.85rem;color:var(--muted)}.files{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}.files button{font-size:.78rem}
+.helper-intro{font-size:.9rem;color:var(--muted);margin:8px 0}.release{display:block;font-size:.82rem;color:var(--muted);overflow-wrap:anywhere}.release input{margin-top:6px}#helpers .copy-box{margin-top:14px}
+.areas{padding:20px 0}.area{border-top:1px solid var(--line);margin:0;scroll-margin-top:78px}.area:last-child{border-bottom:1px solid var(--line)}
+.area>summary{padding:22px 0;display:flex;gap:12px;align-items:center;list-style:none}.area>summary::-webkit-details-marker{display:none}.area>summary:before{content:'+';font-size:1.3rem;color:var(--accent);font-weight:400;line-height:1;width:16px;flex-shrink:0}.area[open]>summary:before{content:'−'}.area.landed>summary{background:var(--soft)}
+.area-name{font-weight:600;font-size:1.1rem;line-height:1.4;margin-right:auto;letter-spacing:-.02em}.area-n{font-size:.75rem;color:var(--muted);white-space:nowrap}.area-body{padding:0 0 24px 28px}
+.changed{font-size:.96rem;line-height:1.7;max-width:69ch}.ticket{color:var(--muted);font-size:.72rem;margin:10px 0 20px}.checks-label{margin:28px 0 8px;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em}
+.step{border:0;border-top:1px solid var(--line);padding:22px 0 24px;margin:0;scroll-margin-top:80px}.step:focus{outline:2px solid var(--focus);outline-offset:7px}
+.step-head{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 10px;margin-bottom:10px}.n{font-family:var(--mono);font-size:.8rem;font-weight:600;color:var(--accent);letter-spacing:.035em}
+.step-tag{display:inline-block;border-radius:3px;padding:1px 6px;font-size:.66rem;line-height:1.5;font-weight:600;letter-spacing:.03em}.tag-changes{color:var(--risk-med);background:var(--risk-med-bg)}.tag-later{color:var(--accent);background:var(--soft)}
+.step-status{font-size:.75rem;color:var(--muted);margin-left:auto}.step[data-r=pass] .step-status{color:var(--risk-low);font-weight:600}.step[data-r=fail] .step-status{color:var(--risk-high);font-weight:600}.step[data-r=blocked] .step-status{color:var(--risk-med);font-weight:600}.step[data-r=later] .step-status{color:var(--accent);font-weight:600}
+.do,.check{font-size:.98rem;line-height:1.7;overflow-wrap:anywhere}.do>strong:first-child{font-weight:600}.check{color:var(--muted);margin-top:5px}.check strong{color:var(--text)}
+.controls{display:flex;align-items:center;flex-wrap:wrap;gap:8px;margin-top:16px}.controls button,.open{font-size:.8rem;padding:7px 11px;line-height:1.5;border-radius:5px;min-height:38px}
+.open{display:inline-flex;align-items:center;border:1px solid var(--line);text-decoration:none;margin-right:4px}.open:hover{background:var(--soft);border-color:var(--accent)}
+.r[aria-pressed=true]{background:var(--soft);border-color:var(--accent);font-weight:600}.r[data-v=fail][aria-pressed=true]{background:var(--risk-high-bg);color:var(--risk-high);border-color:var(--risk-high)}.r[data-v=blocked][aria-pressed=true]{background:var(--risk-med-bg);color:var(--risk-med);border-color:var(--risk-med)}
+.note-button{border-color:transparent;text-decoration:underline;text-underline-offset:3px}.note{display:block;margin-top:12px}
+.more{margin-top:16px}.more>summary{font-size:.85rem;color:var(--accent);width:fit-content;padding:3px 0}.more-body{margin-top:19px;font-size:.9rem;color:var(--muted)}
+.detail-list{display:grid;grid-template-columns:7.8rem minmax(0,1fr);column-gap:18px;row-gap:17px;margin:0}.detail-list dt{font-size:.77rem;color:var(--text);font-weight:600;padding-top:2px}.detail-list dd{margin:0;overflow-wrap:anywhere;min-width:0}.detail-list dd>.procedure-list{margin-top:0}.detail-list [data-detail=how],.detail-list [data-detail=cleanup]{padding-bottom:5px}.detail-list .procedure-list{gap:15px}.detail-list .substeps{gap:10px}
+.coverage{margin-top:22px;font-size:.78rem}.carried{background:transparent}.carried>.nested-content{padding:8px 0}
+.reference-shot{margin-top:24px}.reference-shot img{display:block;max-width:100%;width:680px;height:auto;max-height:540px;object-fit:contain;object-position:left top}.shot-source{display:block;overflow-wrap:anywhere;font-size:.7rem;margin-top:5px}
+.image-open{display:block;text-align:left;border:0;padding:0;min-height:0;width:100%;cursor:zoom-in}.image-open:hover{background:transparent}.image-hint{display:block;font-size:.73rem;color:var(--accent);margin-top:6px}
+.thumbnail{display:flex;align-items:center;gap:12px;width:fit-content;max-width:100%;margin-top:14px;padding:6px;border:1px solid var(--line);text-align:left;cursor:zoom-in;background:var(--surface)}.thumbnail img{width:128px;height:78px;object-fit:contain;background:var(--bg);display:block}.thumbnail span{font-size:.75rem;color:var(--accent);line-height:1.5}.thumbnail time{display:block;color:var(--muted);font-family:var(--mono);font-size:.65rem}
+.evidence ul{padding:4px 0 20px 20px;display:grid;gap:13px;font-size:.87rem}
+#image-dialog{width:min(1440px,calc(100vw - 24px));max-width:calc(100vw - 24px);padding:14px;overflow:auto}#image-dialog img{display:block;width:100%;max-width:100%;height:auto;margin:0}#image-dialog.actual-size img{width:auto;max-width:none}
+#image-dialog .dialog-foot{position:sticky;top:-14px;background:var(--surface);padding-block:8px;z-index:1;gap:20px}.image-stage{overflow:auto;margin-top:12px;max-height:70dvh}.image-actions{display:flex;gap:8px;flex-shrink:0}
+#image-caption{display:block;color:var(--text);font-size:.86rem}#image-date{font-family:var(--mono);font-size:.72rem;color:var(--muted)}#image-size{white-space:nowrap}#image-close{flex-shrink:0}
+@media(max-width:600px){.bar .wrap{min-height:100px}.index-head{display:block}.index-head small{display:block;margin-top:5px}.index-row{grid-template-columns:minmax(0,1fr) auto 2.5rem 1.1rem;gap:8px;padding:14px 3px}.hook{grid-column:1/-1;grid-row:2;font-size:.84rem}.index-row strong{grid-column:1}.index-row .risk{grid-column:2;grid-row:1}.index-row .count{grid-column:3;grid-row:1}.index-arrow{grid-column:4;grid-row:1}
+.area>summary{flex-wrap:wrap;gap:8px;padding-block:20px}.area-name{flex:1;min-width:170px;font-size:1rem}.area>summary .area-n{display:block;order:5;width:100%;padding-left:24px;white-space:normal}.area-body{padding-left:0}.area>summary .count{font-size:.7rem}.area,.step{scroll-margin-top:118px}
+.detail-list{grid-template-columns:1fr;gap:5px}.detail-list dd{margin-bottom:12px}.do,.check{font-size:.94rem}.controls{gap:7px}.controls button,.open{min-height:42px;padding:8px 10px;font-size:.78rem}.step-head{gap:5px 7px}.legend span{display:block;margin-right:0}.before ol{font-size:.8rem}.reference-shot img{width:100%}
+#image-dialog .dialog-foot{display:block}.image-actions{margin-top:10px}.thumbnail img{width:112px;height:70px}}
+</style>
+<script>
+/* Theme: restore the saved choice before first paint; System follows the OS. */
+try{var m=document.querySelector('meta[name="flavour-storage"]'),t=localStorage.getItem((m&&m.content||'html-flavour')+':theme');if(['system','light','dark'].includes(t))document.documentElement.dataset.theme=t;}catch(e){}
+</script>
+<script>
+__FLAVOUR_JS__
+</script>
+<script id="font-license" type="application/json">__GUIDE_FONT_LICENSE__</script>
+<script id="guide-data" type="application/json">__GUIDE_DATA__</script>
+<script>
+/* Pattern extension: a layer such as a UAT guide may replace rules here. Empty for a plain checklist. */
+__PATTERN_EXTENSION__
+</script>
+<script>
+document.addEventListener('DOMContentLoaded',function(){
+'use strict';
+var F=window.Flavour,esc=F.esc,md=F.md,el=F.el;
+var G=JSON.parse(document.getElementById('guide-data').textContent);
+var steps=[],byN={};G.outcomes.forEach(function(o){o.steps.forEach(function(s){s.outcome=o;steps.push(s);byN[s.n]=s;});});
+var state={results:{},notes:{},values:{},tester:'',open:{}};
+function result(n){return state.results[n]||'pending';}
+function flat(t){return String(t||'').replace(/\r?\n+/g,' ').trim();}
+function cell(t){return flat(t).replace(/\|/g,'\\|');}
+function stamp(){var now=new Date(),pad=function(x){return String(x).padStart(2,'0');};return now.getFullYear()+'-'+pad(now.getMonth()+1)+'-'+pad(now.getDate())+' '+pad(now.getHours())+':'+pad(now.getMinutes());}
+
+/* Rules: the generic meaning of each check. A pattern extension may replace any rule. */
+var rules={
+ storageKey:function(){return F.prefix+':'+[G.product||G.title,G.env,G.date].filter(Boolean).join(':')+':'+(G.storageVersion||'v3');},
+ optional:function(s){return !!s.optional;},
+ carried:function(s){return (G.carried||{})[String(s.n)]||'';},
+ accepted:function(s){return rules.optional(s)||!!rules.carried(s);},
+ tags:function(s){var t=[];if(s.changes)t.push({kind:'changes',text:typeof s.changes==='string'?s.changes:'Changes something'});if(s.later)t.push({kind:'later',text:'Can wait · '+s.later});return t;},
+ riskLegend:{high:'a failure blocks the goal or loses data',med:'a failure slows a task or gives a wrong value',low:'a small check of one earlier fault'},
+ noteLabel:'About this area',
+ detailsLine:function(){return G.detailsNote||'';},
+ detailsTitle:function(){return (G.files||[]).length?'Walk details and files':'Walk details';},
+ inputHint:function(p){return p.hint||G.fieldsPlaceholder||'';},
+ helperTitle:'Commands',
+ carriedTitle:'Earlier pass <span class="tag">(optional repeat)</span>',
+ resultLabels:{pass:'Works',fail:'Broken',blocked:'Can’t test',later:'Later'},
+ statusLabels:{pass:'Works',fail:'Broken',blocked:'Can’t test',later:'Later',pending:'Not checked',carried:'Earlier pass'},
+ exposeAs:[]
+};
+/* Final result: an unmarked optional or carried check is an accepted skip; Later never blocks a verdict. */
+function final(s){var r=result(s.n);return r==='pending'&&(rules.optional(s)||rules.carried(s))?'skipped':r;}
+rules.verdict=function(){
+ var pending=steps.filter(function(s){return final(s)==='pending';});
+ if(pending.length)return 'no verdict (stopped at check '+pending[0].n+': '+pending.length+' checks not marked)';
+ if(steps.some(function(s){return final(s)==='fail';}))return 'not green';
+ var blocked=steps.filter(function(s){return final(s)==='blocked';});
+ if(blocked.length)return 'no verdict (blocked: checks '+blocked.map(function(s){return s.n;}).join(', ')+')';
+ var loose=steps.filter(function(s){return final(s)==='skipped'&&!rules.accepted(s);});
+ if(loose.length)return 'no verdict (skipped without an accepted exclusion: checks '+loose.map(function(s){return s.n;}).join(', ')+')';
+ if((G.requiredFields||[]).some(function(k){return !(state.values[k]||'').trim();}))return G.missingFieldsVerdict||'no verdict (complete required walk details)';
+ var later=steps.filter(function(s){return final(s)==='later';}),green=G.successVerdict||'green for this checklist';
+ return later.length?green+' (later: checks '+later.map(function(s){return s.n;}).join(', ')+')':green;
+};
+/* Copy results: a Markdown record of every check, then fails, deferred checks, notes and limits. */
+rules.markdown=function(){
+ var L=['# Results — '+flat(G.title)+' '+stamp(),'','- Checklist: '+flat(G.title)];
+ if(G.baseUrl)L.push('- Base URL: `'+G.baseUrl+'`');
+ L.push('- Person: '+(state.tester.trim()||'(not entered)'));
+ var vals=(G.placeholders||[]).map(function(p){var v=(state.values[p.key]||'').trim();return '`<'+p.key+'>` = '+(v?'`'+v+'`':'(not entered)');});
+ if(vals.length)L.push('- Inputs: '+vals.join('; '));
+ L.push('- Verdict: **'+rules.verdict()+'**','','## Checks','','| Check | Area | Result |','|---|---|---|');
+ steps.forEach(function(s){var note=cell(state.notes[s.n]);L.push('| '+s.n+' | '+cell(s.outcome.key)+' | '+final(s)+(note?' — '+note:'')+' |');});
+ L.push('','## Fails','');var fails=steps.filter(function(s){return final(s)==='fail';});if(!fails.length)L.push('(none)');
+ fails.forEach(function(s){L.push('- '+s.n+' ('+s.outcome.key+': '+flat(s.outcome.heading)+')','  - Expected: '+flat(s.must||s.displayMust),'  - Observed: '+(flat(state.notes[s.n])||'(no note)'));});
+ var later=steps.filter(function(s){return final(s)==='later';});
+ if(later.length){L.push('','## Later','');later.forEach(function(s){var note=flat(state.notes[s.n]);L.push('- '+s.n+' ('+s.outcome.key+') — '+flat(s.later)+(note?'; '+note:''));});}
+ L.push('','## Notes','');var notes=[];
+ steps.forEach(function(s){var r=final(s),note=flat(state.notes[s.n]);if(r==='blocked')notes.push('- Blocked: '+s.n+' ('+s.outcome.key+') — '+(note||'no reason given'));else if(r==='skipped')notes.push('- Skipped: '+s.n+' ('+s.outcome.key+')'+(rules.carried(s)?', '+rules.carried(s):rules.accepted(s)?', optional':', no accepted exclusion')+(note?' — '+note:''));else if(note&&r!=='fail'&&r!=='later')notes.push('- Note: '+s.n+' — '+note);});
+ L.push(notes.length?notes.join('\n'):'(none)');
+ if((G.out||[]).length)L.push('','## Limits','',...G.out.map(function(x){return '- '+x;}));
+ return L.join('\n')+'\n';
+};
+var api={G:G,steps:steps,state:state,rules:rules,result:result,final:final,flat:flat,cell:cell,stamp:stamp,F:F};
+(window.checklistExtensions||[]).forEach(function(extend){extend(api);});
+
+/* State: keep results and walk values where storage works; start every visit with sections closed. */
+var KEY=rules.storageKey();
+try{var saved=JSON.parse(localStorage.getItem(KEY)||'null');if(saved&&typeof saved==='object'){['results','notes','values','open'].forEach(function(k){if(saved[k]&&typeof saved[k]==='object'&&!Array.isArray(saved[k]))state[k]=saved[k];});if(typeof saved.tester==='string')state.tester=saved.tester;}}catch(e){}
+function save(){try{localStorage.setItem(KEY,JSON.stringify(state));}catch(e){}}
+F.onOpenChange=function(id,value){if(id){state.open[id]=value;save();}};
+var detail=F.details;
+function warnings(items){var box=el('div',{class:'warnings'});(items||[]).forEach(function(t){box.appendChild(el('p',{class:'warning'},'<strong>Before you start.</strong> '+md(t)));});return box;}
+function changeTags(s){return rules.tags(s).filter(function(t){return t.kind==='changes';}).length;}
+F.bindTheme(document.getElementById('theme'));
+function areaProgress(o){return o.steps.filter(function(s){return result(s.n)!=='pending';}).length+' / '+o.steps.length;}
+function risk(r){return '<span class="risk risk-'+esc(r)+'">'+esc(r)+'</span>';}
+
+/* Header, before-you-start and legend: filled from content. */
+document.getElementById('eyebrow').textContent=G.eyebrow||G.product||'';document.getElementById('index-note').textContent=G.indexNote||steps.length+' checks';document.getElementById('title').textContent=G.title;document.getElementById('intro').innerHTML=md(G.intro||'');
+(G.before||[]).forEach(function(t){document.getElementById('before').appendChild(el('li',{},md(t)));});if(!(G.before||[]).length)document.getElementById('before-box').hidden=true;
+var legend=Object.assign({},rules.riskLegend,G.riskLegend||{});
+document.getElementById('legend').innerHTML=[['high','High'],['med','Med'],['low','Low']].filter(function(p){return legend[p[0]];}).map(function(p){return '<span><strong>'+p[1]+'</strong> · '+md(legend[p[0]])+'</span>';}).join('');
+document.getElementById('walk-title').textContent=rules.detailsTitle();
+document.getElementById('release').textContent=rules.detailsLine();
+
+/* Walk details: inputs, fixtures and copyable helper commands. */
+var fields=document.getElementById('fields');(G.placeholders||[]).forEach(function(p){if(state.values[p.key]==null&&p.value)state.values[p.key]=p.value;var label=el('label',{},esc(p.label));var input=el('input',{type:'text','data-ph':p.key,spellcheck:'false',placeholder:rules.inputHint(p)});input.value=state.values[p.key]||'';label.appendChild(input);fields.appendChild(label);});
+var tester=document.getElementById('tester');tester.value=state.tester;tester.addEventListener('input',function(){state.tester=tester.value;save();});
+document.addEventListener('input',function(e){var k=e.target.getAttribute&&e.target.getAttribute('data-ph');if(k){state.values[k]=e.target.value;save();}});
+var PH=/<((?:[^<>]|<[^<>]*>)+)>/g;
+function fileText(f){var missing=null;var text=f.content.replace(PH,function(m,k){var v=(state.values[k]||'').trim();if(!v&&!missing)missing=k;return v||m;});return missing?{missing:missing}:{text:text};}
+(G.files||[]).forEach(function(f){var b=el('button',{type:'button'},esc(f.name));b.addEventListener('click',function(){var t=fileText(f);if(t.missing){window.alert('Enter '+t.missing+' in Walk details first.');return;}var url=URL.createObjectURL(new Blob([t.text],{type:'text/csv;charset=utf-8'}));var a=el('a',{href:url,download:f.name});document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(url);},1000);});document.getElementById('files').appendChild(b);});
+(G.helpers||[]).forEach(function(h){document.getElementById('helpers').appendChild(F.copyBox(h.code,h.label));});
+var walkList=F.procedure(G.walkNotes||[],false);walkList.classList.add('setup-list');document.getElementById('walk-notes').replaceWith(walkList);
+document.getElementById('helper-title').textContent=G.helperTitle||rules.helperTitle;document.getElementById('helper-intro').textContent=G.helperIntro||'';document.getElementById('helper-reminder').innerHTML=md(G.helperReminder||'');
+if(!(G.helpers||[]).length)document.getElementById('helper-tools').hidden=true;
+
+function flowSvg(flow,vertical,id){var boxes=flow.boxes,n=boxes.length,bw=vertical?250:Math.min(170,(680-(n-1)*20)/n),bh=54,gap=vertical?24:20,width=vertical?280:n*bw+(n-1)*gap,height=vertical?n*bh+(n-1)*gap:bh+4;var pieces=['<svg class="flow '+(vertical?'flow-narrow':'flow-wide')+'" viewBox="0 0 '+width+' '+height+'" role="img" aria-labelledby="'+id+'-title '+id+'-desc" xmlns="http://www.w3.org/2000/svg"><title id="'+id+'-title">'+esc(flow.title)+'</title><desc id="'+id+'-desc">'+esc(boxes.map(function(b){return b.join(' ');}).join(' → '))+'</desc><defs><marker id="'+id+'-arrow" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="5" markerHeight="5" orient="auto"><path d="M0 0 L8 4 L0 8 Z"/></marker></defs>'];boxes.forEach(function(lines,i){var x=vertical?15:i*(bw+gap),y=vertical?i*(bh+gap):2;pieces.push('<g'+(i===flow.accent?' class="emphasis"':'')+'><rect x="'+x+'" y="'+y+'" width="'+bw+'" height="'+bh+'" rx="7"/>');lines.forEach(function(line,j){pieces.push('<text x="'+(x+bw/2)+'" y="'+(y+bh/2+(j-(lines.length-1)/2)*17+5)+'">'+esc(line)+'</text>');});pieces.push('</g>');if(i<n-1){var d=vertical?'M140 '+(y+bh+3)+' V'+(y+bh+gap-4):'M'+(x+bw+3)+' '+(y+bh/2)+' H'+(x+bw+gap-4);pieces.push('<path d="'+d+'" marker-end="url(#'+id+'-arrow)"/>');}});pieces.push('</svg>');return pieces.join('');}
+
+/* Check card: action, expected result, tags, reference thumbnail and result controls. */
+function row(s){var n=String(s.n),r=el('article',{class:'step',id:'step-'+n,'data-n':n,tabindex:'-1'});
+var tags=rules.tags(s).map(function(t){return '<span class="step-tag tag-'+esc(t.kind)+'">'+esc(t.text)+'</span>';}).join('');
+r.appendChild(el('div',{class:'step-head'},'<span class="n">'+esc(n)+'</span>'+tags+'<span class="step-status"></span>'));
+r.appendChild(el('div',{class:'do'},'<strong>Do:</strong> '+md(s.displayAction)));r.appendChild(el('div',{class:'check'},'<strong>Check:</strong> '+md(s.displayMust)));
+if(s.screenshot){var shot=G.screenshots[s.screenshot],thumb=el('button',{type:'button',class:'thumbnail','aria-label':'Enlarge reference screenshot for '+n});thumb.appendChild(el('img',{src:shot.data,alt:shot.alt,loading:'lazy',decoding:'async'}));thumb.appendChild(el('span',{},'View reference screenshot<time datetime="'+esc(shot.date)+'">'+esc(shot.date)+'</time>'));thumb.addEventListener('click',function(){openImage(shot,thumb);});r.appendChild(thumb);}
+var controls=el('div',{class:'controls'});
+if(s.route!=null&&G.baseUrl)controls.appendChild(el('a',{class:'open',href:G.baseUrl+s.route.replace(/^<base>/,''),target:'_blank',rel:'noopener'},'Link ↗'));
+['pass','fail','blocked'].concat(s.later?['later']:[]).forEach(function(v){var label=rules.resultLabels[v];var b=el('button',{class:'r',type:'button','data-v':v,'aria-label':label+' (step '+n+')','aria-pressed':'false'},esc(label));b.addEventListener('click',function(){setResult(n,result(n)===v?null:v);});controls.appendChild(b);});
+var noteButton=el('button',{class:'note-button',type:'button','aria-label':'Note for step '+n},'Note');noteButton.addEventListener('click',function(){var ta=r.querySelector('textarea.note');ta.hidden=false;ta.focus();});controls.appendChild(noteButton);r.appendChild(controls);
+var ta=el('textarea',{class:'note',rows:'2','data-n':n,'aria-label':'Note for step '+n,placeholder:'Describe what you saw.'});ta.value=state.notes[n]||'';ta.addEventListener('input',function(){state.notes[n]=ta.value;save();});r.appendChild(ta);
+/* More: the detailed procedure, its command boxes, undo commands and the larger reference image. */
+var d=s.detail||{},parts=[['data','Data & IDs'],['how','Do it step by step'],['expect','You should see'],['failure','A failure looks like'],['why','Why this matters'],['cleanup','Put it back']].filter(function(p){return d[p[0]]!=null;});
+if(parts.length||s.screenshot||s.coverage){var more=detail('more-'+n,'More · details and reference','more');var mb=el('div',{class:'more-body'});
+if(parts.length){var dl=el('dl',{class:'detail-list'});parts.forEach(function(pair){dl.appendChild(el('dt',{},esc(pair[1])));var dd=el('dd',{'data-detail':pair[0]});if(pair[0]==='how'&&d.warnings)dd.appendChild(warnings(d.warnings));if(Array.isArray(d[pair[0]]))dd.appendChild(F.procedure(d[pair[0]],false,pair[0]==='cleanup'?{commandLabel:'Undo command',commandKind:'undo'}:{}));else dd.innerHTML=md(d[pair[0]]);dl.appendChild(dd);});mb.appendChild(dl);}
+if(s.screenshot){var shot2=G.screenshots[s.screenshot],fig=el('figure',{class:'reference-shot'}),ib=el('button',{type:'button',class:'image-open','aria-label':'Enlarge reference screenshot for '+n});ib.appendChild(el('img',{src:shot2.data,alt:shot2.alt,loading:'lazy',decoding:'async'}));ib.addEventListener('click',function(){openImage(shot2,ib);});fig.appendChild(ib);fig.appendChild(el('span',{class:'image-hint'},'Select the image to enlarge it'));fig.appendChild(el('figcaption',{},md(shot2.caption)+'<span class="shot-source"><time datetime="'+esc(shot2.date)+'">'+esc(shot2.date)+'</time> · Reference: '+esc(shot2.source)+'</span>'));mb.appendChild(fig);}
+if(s.coverage)mb.appendChild(el('p',{class:'coverage'},'<strong>Earlier coverage:</strong> '+esc(s.displayCoverage||s.coverage)));more.appendChild(mb);r.appendChild(more);}
+r.addEventListener('focusin',function(){focused=n;});return r;}
+
+/* Index and areas: each index row opens its area; the area summary counts checks, screenshots and changes. */
+var index=document.getElementById('index'),areas=document.getElementById('areas');
+G.outcomes.forEach(function(o,i){var id='area-'+i;var item=el('li',{}),open=el('button',{class:'index-row jump',type:'button','aria-controls':id,'aria-label':'Open '+o.heading},'<strong>'+esc(o.shortTitle||o.heading)+'</strong><span class="hook">'+esc(o.hook||'')+'</span>'+risk(o.risk)+'<span class="count" data-count="'+i+'"></span><span class="index-arrow" aria-hidden="true">↓</span>');open.addEventListener('click',function(){F.jump(id);});item.appendChild(open);index.appendChild(item);
+var changing=o.steps.filter(changeTags).length;
+var area=detail(id,'<span class="area-name">'+esc(o.heading)+'</span>'+risk(o.risk)+'<span class="area-n">'+o.steps.length+(o.steps.length===1?' check · ':' checks · ')+o.steps.filter(function(s){return !!s.screenshot;}).length+' with screenshots'+(changing?' · '+changing+' change something':'')+'</span><span class="count" data-count="'+i+'"></span>','area');var body=el('div',{class:'area-body'});
+if(o.note)body.appendChild(el('p',{class:'changed'},'<strong>'+esc(G.noteLabel||rules.noteLabel)+':</strong> '+md(o.note)));body.appendChild(el('div',{class:'ticket'},esc(o.key)));
+(o.diagrams||[]).forEach(function(flow,j){var fig=el('figure',{'data-diagram':flow.title});fig.appendChild(el('div',{class:'figure-title'},esc(flow.title)));fig.appendChild(el('div',{},flowSvg(flow,false,id+'-flow-'+j+'-wide')+flowSvg(flow,true,id+'-flow-'+j+'-narrow')));fig.appendChild(el('figcaption',{},esc(flow.caption)));body.appendChild(fig);});
+/* Setup: numbered preparation and put-back steps with lettered substeps. */
+var points=o.setupPoints||o.setup;if(points&&points.length){var setup=detail('setup-'+i,'Setup and put back');var inner=el('div',{class:'nested-content'});inner.appendChild(warnings(o.setupWarnings));var list=F.procedure(points.map(function(p){return typeof p==='string'?{lead:'Prepare.',text:p}:p;}),false);list.classList.add('setup-list');inner.appendChild(list);setup.appendChild(inner);body.appendChild(setup);}
+var needed=o.steps.filter(function(s){return !rules.carried(s);}),passed=o.steps.filter(function(s){return !!rules.carried(s);});if(needed.length){body.appendChild(el('h3',{class:'checks-label'},'Checks'));needed.forEach(function(s){body.appendChild(row(s));});}if(passed.length){var cd=detail('carried-'+i,rules.carriedTitle,'nested carried');var cb=el('div',{class:'nested-content'});passed.forEach(function(s){cb.appendChild(row(s));});cd.appendChild(cb);body.appendChild(cd);}area.appendChild(body);areas.appendChild(area);});
+(G.displayOut||G.out||[]).forEach(function(t){document.getElementById('out').appendChild(el('li',{},md(t)));});if(!(G.displayOut||G.out||[]).length)document.getElementById('evidence').hidden=true;
+['walk-details','helper-tools','evidence'].forEach(function(id){F.bindDetails(document.getElementById(id));});
+document.getElementById('expand').addEventListener('click',function(){F.setAll(true);});
+document.getElementById('collapse').addEventListener('click',function(){F.setAll(false);});
+
+/* Results: record, show status and progress; Later is offered only on checks whose content allows it. */
+function setResult(n,r){if(r)state.results[n]=r;else delete state.results[n];save();refresh();}
+function refresh(){steps.forEach(function(s){var node=document.getElementById('step-'+s.n),r=result(s.n);node.dataset.r=r;node.querySelectorAll('.r').forEach(function(b){b.setAttribute('aria-pressed',String(b.dataset.v===r));});node.querySelector('.step-status').textContent=r==='pending'?(rules.carried(s)?rules.statusLabels.carried:rules.statusLabels.pending):rules.statusLabels[r];var ta=node.querySelector('textarea.note');ta.hidden=!(r==='fail'||r==='blocked'||r==='later'||(state.notes[s.n]||'').trim()||document.activeElement===ta);});
+var needed=steps.filter(function(s){return !rules.optional(s)&&!rules.carried(s);}),done=needed.filter(function(s){return result(s.n)!=='pending';}).length;document.getElementById('done').textContent=done+' / '+needed.length+' required';document.getElementById('track').style.width=(needed.length?100*done/needed.length:100)+'%';G.outcomes.forEach(function(o,i){document.querySelectorAll('[data-count="'+i+'"]').forEach(function(n){n.textContent=areaProgress(o);});});}
+var focused=null;
+document.addEventListener('keydown',function(e){if(e.ctrlKey||e.altKey||e.metaKey||document.getElementById('dlg').open||document.getElementById('image-dialog').open)return;var t=e.target;if(t&&(t.tagName==='INPUT'||t.tagName==='TEXTAREA'||t.tagName==='SELECT'))return;var order=Array.from(document.querySelectorAll('.step')).map(function(n){return n.dataset.n;});if(e.key==='j'||e.key==='k'){var i=order.indexOf(focused),next=i<0?0:Math.max(0,Math.min(order.length-1,i+(e.key==='j'?1:-1)));focused=order[next];var node=document.getElementById('step-'+focused);F.reveal(node);node.focus({preventScroll:true});node.scrollIntoView({block:'center',behavior:F.motion.matches?'instant':'smooth'});e.preventDefault();return;}var map={'1':'pass','2':'fail','3':'blocked','4':'later','0':null};if(focused!=null&&e.key in map){if(e.key==='4'&&!byN[focused].later)return;setResult(focused,map[e.key]);e.preventDefault();}});
+var dlg=document.getElementById('dlg'),box=document.getElementById('md'),status=document.getElementById('dlg-status');document.getElementById('copy').addEventListener('click',function(){box.value=rules.markdown();dlg.showModal();var fallback=function(){box.focus();box.select();try{if(document.execCommand('copy')){status.textContent='Copied.';return;}}catch(e){}status.textContent='Select all and copy.';};if(navigator.clipboard&&window.isSecureContext)navigator.clipboard.writeText(box.value).then(function(){status.textContent='Copied.';},fallback);else fallback();});document.getElementById('dlg-close').addEventListener('click',function(){dlg.close();});
+
+/* Lightbox: the original image with caption and date; Escape or an outside click closes it and restores focus. */
+var imageDialog=document.getElementById('image-dialog'),imageTrigger=null;
+function openImage(shot,trigger){imageTrigger=trigger;imageDialog.classList.remove('actual-size');document.getElementById('image-size').textContent='Actual size';document.getElementById('full-image').src=shot.data;document.getElementById('full-image').alt=shot.alt;document.getElementById('image-caption').innerHTML=md(shot.caption);document.getElementById('image-date').textContent=shot.date;document.getElementById('image-date').dateTime=shot.date;imageDialog.showModal();imageDialog.scrollTop=0;imageDialog.scrollLeft=0;}
+function closeImage(){imageDialog.close();if(imageTrigger)imageTrigger.focus({preventScroll:true});}
+document.getElementById('image-close').addEventListener('click',closeImage);
+document.getElementById('image-size').addEventListener('click',function(){var actual=imageDialog.classList.toggle('actual-size');this.textContent=actual?'Fit image':'Actual size';});
+imageDialog.addEventListener('click',function(e){if(e.target===imageDialog){var b=imageDialog.getBoundingClientRect();if(e.clientX<b.left||e.clientX>b.right||e.clientY<b.top||e.clientY>b.bottom)closeImage();}});
+imageDialog.addEventListener('cancel',function(e){e.preventDefault();closeImage();});
+refresh();
+var exposed={markdown:function(){return rules.markdown();},verdict:function(){return rules.verdict();},fileText:function(name){var f=(G.files||[]).find(function(x){return x.name===name;});return f?fileText(f):null;}};
+window.checklist=exposed;rules.exposeAs.forEach(function(name){window[name]=exposed;});
+});
+</script>
+</head>
+<body>
+<!-- Top bar: progress, theme choice, disclosure controls and results. -->
+<div class="bar"><div class="wrap"><div class="progress"><span id="done"></span><div class="track"><span id="track"></span></div></div><label class="theme-control">Theme <select id="theme" aria-label="Theme"><option value="system">System</option><option value="light">Light</option><option value="dark">Dark</option></select></label><button id="expand" type="button">Expand all</button><button id="collapse" type="button">Collapse all</button><button id="copy" class="primary" type="button">Copy results</button></div></div>
+<main class="wrap">
+<!-- Header: title and introduction. -->
+<section class="overview" aria-label="Overview">
+<p class="eyebrow" id="eyebrow"></p><h1 id="title"></h1><p id="intro" class="intro"></p>
+<!-- Before you start: prerequisites for this walk. -->
+<div class="before" id="before-box"><h2>Before you start</h2><ol id="before"></ol></div>
+<!-- Legend and index: risk meanings from content, and area navigation. -->
+<nav aria-label="Area index"><div class="index-head"><h2>Choose an area</h2><small id="index-note"></small></div><p class="legend" id="legend"></p><ul id="index" class="index"></ul></nav>
+</section>
+<!-- Walk details: inputs, fixtures and helper commands. -->
+<details id="walk-details" class="tools" data-persist><summary id="walk-title"></summary><div class="tool-body"><div id="release" class="release"></div><ol class="setup-list" id="walk-notes"></ol><div id="fields" class="fields"></div><label class="release">Your name or email<input id="tester" type="text" autocomplete="email"></label><div id="files" class="files"></div></div></details>
+<details id="helper-tools" class="tools" data-persist><summary id="helper-title"></summary><div class="tool-body"><p class="helper-intro" id="helper-intro"></p><p class="helper-intro" id="helper-reminder"></p><div id="helpers"></div></div></details>
+<!-- Areas, check cards and More sections are built from the content above. -->
+<section id="areas" class="areas" aria-label="Areas"></section>
+<details id="evidence" class="evidence" data-persist><summary>Evidence limits · what this checklist does not prove</summary><ul id="out"></ul></details>
+<p class="footer">This browser saves results when local storage works. Each visit starts with closed sections. Keys: <strong>j / k</strong> selects a check; <strong>1 / 2 / 3</strong> records a result; <strong>4</strong> marks Later where offered; <strong>0</strong> clears it.</p>
+</main>
+<!-- Results: copyable findings and clipboard fallback. -->
+<dialog id="dlg"><strong>Your results</strong><p class="release">Send these results to the person who requested the check.</p><textarea id="md" readonly aria-label="Findings text"></textarea><div class="dialog-foot"><span id="dlg-status"></span><button id="dlg-close" type="button">Close</button></div></dialog>
+<!-- Lightbox: original pixels with caption and capture date. -->
+<dialog id="image-dialog" aria-label="Reference screenshot"><div class="dialog-foot"><div><span id="image-caption"></span><time id="image-date"></time></div><div class="image-actions"><button id="image-size" type="button">Actual size</button><button id="image-close" type="button">Close image</button></div></div><div class="image-stage"><img id="full-image" alt=""></div></dialog>
+</body>
+</html>

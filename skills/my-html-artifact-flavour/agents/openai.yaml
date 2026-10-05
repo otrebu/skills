@@ -1,0 +1,6 @@
+interface:
+  display_name: "My HTML Artifact Flavour"
+  short_description: "House style and checklist pattern for offline HTML pages"
+  default_prompt: "Use $my-html-artifact-flavour to build this HTML page in the house style."
+policy:
+  allow_implicit_invocation: true

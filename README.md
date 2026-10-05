@@ -18,6 +18,7 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 | [`herdr-orchestration`](./skills/herdr-orchestration) | Uses any host agent as a Herdr control tower to route workers by capability, supervise integration, verify the result, and clean up only its own panes and tabs. |
 | [`herdr-wrap-up`](./skills/herdr-wrap-up) | Wraps up work that ran across many Herdr sessions: inventories panes, worktrees, Docker, processes and browser daemons, removes what can be rebuilt or resumed, keeps what can't, and reports what was freed. |
 | [`maintain-llm-wiki`](./skills/maintain-llm-wiki) | Builds and maintains a compounding markdown wiki from immutable sources, following [Karpathy's LLM Wiki pattern](https://gist.github.com/karpathy/442a6bf555914893e9891c11519de94f) for setup, ingest, cited queries, and health checks. |
+| [`my-html-artifact-flavour`](./skills/my-html-artifact-flavour) | House style for every HTML page or artifact an agent makes: IBM Plex type with embedded fonts, role colour tokens for light and dark, copy boxes, disclosures and a theme switch, offline by default. Ships `page.py` for any page and a checklist pattern (template, standard-library renderer, schema, example, jsdom verifier). `uat-guide` (in a separate private skills repo) builds on the checklist pattern by installed path. |
 | [`native-tools-first`](./skills/native-tools-first) | Right-sizes technical plans and implementations around existing tool capabilities, isolating only the necessary custom glue and stopping scope drift before it becomes a framework. |
 | [`publish-artifacts`](./skills/publish-artifacts) | Publishes a local HTML artifact tree to `ubuilt.dev` (Cloudflare R2 + Worker), mapping folders to URL paths, with per-folder access — public, or gated to named collaborators by email one-time-PIN. Additive and multi-machine safe. |
 | [`structured-replies`](./skills/structured-replies) | Shapes every reply: simple questions get a terse direct answer; complex ones get headlines + an optional ASCII visual + brief detail sections. (See also `concise-replies`, a tournament-tuned variant.) |
@@ -26,6 +27,8 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 | [`walkthrough`](./skills/walkthrough) | Presents a list — findings, tasks, options, or a file of items — one at a time for focused interactive review, with `next / back / discuss / edit / skip / goto / find / list / done` controls and a running progress header. |
 | [`work-tree-canvas`](./skills/work-tree-canvas) | Maintains a persistent Obsidian Canvas of your work tree across sessions — adds nodes for new branches, tracks the current 🎯 focus, keeps the layout tidy. |
 | [`write-simply`](./skills/write-simply) | Writes plain technical text with literal wording and relaxed sentence rules for descriptions and steps. |
+
+`my-html-artifact-flavour` is a dependency of other skills: they reach its files at `~/.agents/skills/my-html-artifact-flavour/`, so install it globally (`-g`). It optionally reads `write-simply` for page wording.
 
 ## Install from GitHub
 

@@ -1,0 +1,305 @@
+{
+  "title": "Move the static site to the new host",
+  "pageTitle": "Static site move",
+  "eyebrow": "Example runbook",
+  "intro": "Copy the site to the new host and switch its name. Then check that nothing broke. This takes about 20 minutes.",
+  "date": "2026-10-05",
+  "baseUrl": "https://example.invalid",
+  "storageVersion": "example-1",
+  "indexNote": "6 checks · 20 minutes",
+  "before": [
+    "**Use a terminal.** It needs `ssh`, `rsync` and `dig`.",
+    "**Tell the team.** Nobody publishes to the site during the move."
+  ],
+  "riskLegend": {
+    "high": "a mistake takes the site offline",
+    "med": "a mistake shows old or wrong pages",
+    "low": "a small follow-up after the move"
+  },
+  "detailsNote": "Old host: old-host.example · New host: new-host.example",
+  "placeholders": [
+    {
+      "key": "ticket",
+      "label": "Change ticket",
+      "hint": "For example, CHANGE-12"
+    }
+  ],
+  "walkNotes": [
+    {
+      "lead": "Record the ticket.",
+      "text": "Enter the change ticket below."
+    }
+  ],
+  "helperTitle": "Shared commands",
+  "helperIntro": "Use these commands in any area.",
+  "helpers": [
+    {
+      "label": "Show the active host",
+      "code": "dig +short www.example.org\ncurl -sI https://www.example.org | grep -i '^server:'"
+    }
+  ],
+  "out": [
+    "This walk does not test email or search ranking."
+  ],
+  "screenshots": {
+    "site-home": {
+      "path": "example-shot.png",
+      "source": "example-shot.png",
+      "date": "2026-10-05",
+      "caption": "Home page on the old host. Compare the header and the footer only.",
+      "alt": "Site home page with a header, four text lines and a footer"
+    }
+  },
+  "outcomes": [
+    {
+      "key": "Area A",
+      "heading": "Before you start",
+      "shortTitle": "Before you start",
+      "hook": "Record the old values before you change anything.",
+      "risk": "high",
+      "note": "Nothing changes in this area. These checks record the values that the undo commands need.",
+      "setupPoints": [
+        {
+          "lead": "Prepare your terminal.",
+          "text": "Sign in to the deploy account on both hosts."
+        },
+        {
+          "lead": "Put it back.",
+          "text": "Nothing changes in this area, so nothing needs putting back."
+        }
+      ],
+      "steps": [
+        {
+          "n": "A1",
+          "route": "/dns/www",
+          "displayAction": "**Check the DNS record.** Read the address of the site name.",
+          "displayMust": "The command prints the old host address `192.0.2.10`.",
+          "detail": {
+            "data": "The site name is `www.example.org`. The old host address is `192.0.2.10`.",
+            "how": [
+              {
+                "lead": "Run the command.",
+                "command": "dig +short www.example.org"
+              },
+              {
+                "lead": "Read the output.",
+                "text": "Compare the address with the old host address."
+              }
+            ],
+            "expect": "The command prints `192.0.2.10`. No other address shows.",
+            "failure": "The command prints another address or nothing. Stop and ask the site owner.",
+            "why": "Check B2 changes this record. The undo command of B2 needs the old value.",
+            "cleanup": [
+              {
+                "lead": "Finish the check.",
+                "text": "This check only reads, so nothing needs undoing."
+              }
+            ]
+          }
+        },
+        {
+          "n": "A2",
+          "route": "/",
+          "screenshot": "site-home",
+          "displayAction": "**Check the home page.** Open the site on the old host.",
+          "displayMust": "The home page shows its header, its text and its footer.",
+          "detail": {
+            "data": "The site is `www.example.org` on the old host. You enter no values.",
+            "how": [
+              {
+                "lead": "Open the page.",
+                "text": "Select **Link**."
+              },
+              {
+                "lead": "Compare the page.",
+                "text": "Compare it with the reference screenshot."
+              }
+            ],
+            "expect": "The page shows the same header and footer as the reference screenshot.",
+            "failure": "The page is blank, shows an error, or has no footer.",
+            "why": "You compare the new host with this page in check C1.",
+            "cleanup": [
+              {
+                "lead": "Finish the check.",
+                "text": "This check only reads, so nothing needs undoing."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "Area B",
+      "heading": "Copy and switch",
+      "shortTitle": "Copy and switch",
+      "hook": "Copy the files, then point the name at the new host.",
+      "risk": "high",
+      "note": "Both checks change something. Each one has an undo command under Put it back.",
+      "diagrams": [
+        {
+          "title": "Move order",
+          "boxes": [["Old host"], ["Copy files"], ["Switch DNS"], ["New host"]],
+          "caption": "Copy the files first. The name moves only after the new host has every file.",
+          "accent": 3
+        }
+      ],
+      "setupPoints": [
+        {
+          "lead": "Check area A.",
+          "text": "Do this area only after A1 and A2 pass."
+        },
+        {
+          "lead": "Put it back.",
+          "text": "Run the undo commands from B2 back to B1."
+        }
+      ],
+      "steps": [
+        {
+          "n": "B1",
+          "route": "/hosts/new",
+          "changes": true,
+          "displayAction": "**Copy the files.** Copy the site files to the new host.",
+          "displayMust": "`rsync` ends with a total size and no error.",
+          "detail": {
+            "data": "Source: the `public` folder of the site build. Target: `/srv/site` on `new-host.example`.",
+            "warnings": [
+              "Check the target folder before you run `rsync --delete`."
+            ],
+            "how": [
+              {
+                "lead": "Run the command.",
+                "command": "rsync -av --delete ./public/ deploy@new-host.example:/srv/site/"
+              },
+              {
+                "lead": "Read the output.",
+                "text": "Check that the last line shows a total size."
+              }
+            ],
+            "expect": "The last line shows a total size. No line starts with `rsync error`.",
+            "failure": "A line starts with `rsync error`, or the command stops early.",
+            "why": "The new host must have every file before the name points at it.",
+            "cleanup": [
+              {
+                "lead": "Empty the new folder.",
+                "command": "ssh deploy@new-host.example 'rm -rf /srv/site/*'"
+              }
+            ]
+          }
+        },
+        {
+          "n": "B2",
+          "route": "/dns/www",
+          "changes": "Changes DNS",
+          "displayAction": "**Switch the name.** Point `www.example.org` at the new host.",
+          "displayMust": "The command prints the new host address `198.51.100.20`.",
+          "detail": {
+            "data": "New host address: `198.51.100.20`. Old host address: `192.0.2.10`. Time to live: 300 seconds.",
+            "how": [
+              {
+                "lead": "Change the record.",
+                "command": "dnsctl set www.example.org A 198.51.100.20 --ttl 300"
+              },
+              {
+                "lead": "Read the record.",
+                "command": "dig +short www.example.org"
+              }
+            ],
+            "expect": "The second command prints `198.51.100.20`.",
+            "failure": "The second command still prints `192.0.2.10` after five minutes.",
+            "why": "Visitors reach the new host only after the name points at it.",
+            "cleanup": [
+              {
+                "lead": "Point the name back.",
+                "command": "dnsctl set www.example.org A 192.0.2.10 --ttl 300"
+              },
+              {
+                "lead": "Wait for the change.",
+                "text": "Wait five minutes before you trust the old host again."
+              }
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "key": "Area C",
+      "heading": "After the switch",
+      "shortTitle": "After the switch",
+      "hook": "Check the new host, now and at the next renewal.",
+      "risk": "med",
+      "note": "One check runs today. The other waits for the next certificate renewal.",
+      "setupPoints": [
+        {
+          "lead": "Wait for DNS.",
+          "text": "Start five minutes after B2."
+        },
+        {
+          "lead": "Put it back.",
+          "text": "Nothing changes in this area, so nothing needs putting back."
+        }
+      ],
+      "steps": [
+        {
+          "n": "C1",
+          "route": "/",
+          "displayAction": "**Check the new host.** Open the site after the switch.",
+          "displayMust": "The home page loads from the new host.",
+          "detail": {
+            "data": "The site is `www.example.org` on the new host. You enter no values.",
+            "how": [
+              {
+                "lead": "Read the server name.",
+                "command": "curl -sI https://www.example.org | grep -i '^server:'"
+              },
+              {
+                "lead": "Open the page.",
+                "text": "Select **Link**."
+              },
+              {
+                "lead": "Compare the page.",
+                "text": "Compare it with the reference screenshot of check A2."
+              }
+            ],
+            "expect": "The server name is the new host. The page matches the reference screenshot.",
+            "failure": "The server name is the old host, or the page differs from check A2.",
+            "why": "This proves that visitors now reach the new host.",
+            "cleanup": [
+              {
+                "lead": "Finish the check.",
+                "text": "This check only reads, so nothing needs undoing."
+              }
+            ]
+          }
+        },
+        {
+          "n": "C2",
+          "later": "on the next certificate renewal",
+          "displayAction": "**Check the renewal.** Confirm that the new host renews its certificate.",
+          "displayMust": "The renewal log shows a new certificate.",
+          "detail": {
+            "data": "The renewal log is `/var/log/cert-renew.log` on the new host.",
+            "how": [
+              {
+                "lead": "Wait for the renewal.",
+                "text": "Do this check after the next renewal, not today."
+              },
+              {
+                "lead": "Read the log.",
+                "command": "ssh deploy@new-host.example 'tail -n 20 /var/log/cert-renew.log'"
+              }
+            ],
+            "expect": "The last lines show a new certificate with a later end date.",
+            "failure": "The log shows an error, or the end date did not change.",
+            "why": "A certificate that does not renew takes the site offline later.",
+            "cleanup": [
+              {
+                "lead": "Finish the check.",
+                "text": "This check only reads, so nothing needs undoing."
+              }
+            ]
+          }
+        }
+      ]
+    }
+  ]
+}

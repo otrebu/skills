@@ -1,0 +1,75 @@
+/* my-html-artifact-flavour foundation: tokens, type, layout and shared components.
+   Colours are role tokens. Light is the default; Dark applies for data-theme="dark",
+   and for System when the OS prefers dark. Never use raw colours in components. */
+:root{color-scheme:light;--bg:#faf9f5;--surface:#fff;--text:#24332f;--muted:#5c6b64;--line:#d9dfd8;--accent:#1c6654;--soft:#e9f1eb;--risk-high:#943e33;--risk-high-bg:#f9eae5;--risk-med:#75560f;--risk-med-bg:#f6efd9;--risk-low:#376746;--risk-low-bg:#e8f0e7;--fail:#a2322a;--focus:#137b60;--font:"IBM Plex Sans",sans-serif;--serif:"IBM Plex Serif",serif;--mono:"IBM Plex Mono",monospace;--radius:5px}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#171d1b;--surface:#202824;--text:#e4ebe5;--muted:#acbab1;--line:#3c4941;--accent:#8fd2b3;--soft:#253d31;--risk-high:#f2b2a5;--risk-high-bg:#422c28;--risk-med:#ead293;--risk-med-bg:#3d3523;--risk-low:#aed5b6;--risk-low-bg:#293e30;--fail:#f2b2a5;--focus:#8fd2b3}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#171d1b;--surface:#202824;--text:#e4ebe5;--muted:#acbab1;--line:#3c4941;--accent:#8fd2b3;--soft:#253d31;--risk-high:#f2b2a5;--risk-high-bg:#422c28;--risk-med:#ead293;--risk-med-bg:#3d3523;--risk-low:#aed5b6;--risk-low-bg:#293e30;--fail:#f2b2a5;--focus:#8fd2b3}}
+
+/* Base type: Sans body, Serif display heading, Mono code and numbers; weights 400 and 600 only. */
+*{box-sizing:border-box}html{font-synthesis:none}body{margin:0;background:var(--bg);color:var(--text);font:16px/1.65 var(--font)}
+h1,h2,h3,p,ul,ol{margin:0}h2,h3{font-weight:600}strong,b{font-weight:600}
+h1{font:normal clamp(2rem,4vw,2.8rem)/1.16 var(--serif);letter-spacing:-.035em;max-width:24ch}h2{font-size:1.15rem;line-height:1.4;letter-spacing:-.02em}h3{font-size:1rem}
+a{color:var(--accent)}code{font:400 .84em/1.55 var(--mono);overflow-wrap:anywhere}[hidden]{display:none!important}
+button,input,textarea,select{font:inherit}button,a,input,textarea,select,summary{-webkit-tap-highlight-color:transparent}button,summary{cursor:pointer}
+:focus-visible{outline:3px solid var(--focus);outline-offset:4px}
+.wrap{width:min(100%,52rem);margin:auto;padding-inline:24px}
+
+/* Controls: quiet bordered buttons, one filled primary action, inputs on the surface colour. */
+button{color:inherit;background:transparent;border:1px solid var(--line);border-radius:var(--radius);padding:.42rem .75rem;min-height:38px}button:hover{border-color:var(--accent);background:var(--soft)}
+.primary{background:var(--accent);color:var(--bg);border-color:var(--accent);font-weight:600}.primary:hover{background:var(--accent);color:var(--bg);filter:brightness(1.1)}
+input,textarea{width:100%;max-width:100%;color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:9px 11px;font-size:.9rem}input{min-height:42px}
+
+/* Top bar: sticky progress or page name, theme switch, page actions. */
+.bar{position:sticky;top:0;z-index:10;background:var(--bg);border-bottom:1px solid var(--line)}.bar .wrap{display:flex;gap:8px;align-items:center;min-height:62px;padding-block:10px}
+.bar button{font-size:.78rem;white-space:nowrap}.bar-title{margin-right:auto;min-width:0;font-weight:600;font-size:.9rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.progress{margin-right:auto;min-width:0;display:grid;gap:7px}.progress span{font-family:var(--mono);font-size:.77rem;white-space:nowrap;line-height:1.2;font-variant-numeric:tabular-nums}
+.track{height:3px;background:var(--line);width:100%;border-radius:10px;overflow:hidden}.track span{display:block;height:100%;width:0;background:var(--accent)}
+.theme-control{display:flex;align-items:center;gap:6px;font-size:.75rem;color:var(--muted)}
+.theme-control select{color:var(--text);background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:6px;min-height:38px;font-size:.78rem}
+
+/* Page header. */
+.overview{padding-block:44px 24px}.eyebrow{color:var(--accent);font-size:.7rem;letter-spacing:.14em;text-transform:uppercase;font-weight:600;margin-bottom:12px}.intro{margin-top:13px;color:var(--muted);font-size:1rem}
+.section-label{margin:28px 0 8px;color:var(--muted);font-size:.72rem;text-transform:uppercase;letter-spacing:.1em;font-weight:600}
+
+/* Chips and tags: short uppercase labels; colour pairs are contrast-checked. */
+.chip,.risk{display:inline-block;border-radius:3px;padding:2px 6px;font-size:.64rem;line-height:1.5;text-transform:uppercase;letter-spacing:.045em;font-weight:600;white-space:nowrap}
+.chip-high,.risk-high{color:var(--risk-high);background:var(--risk-high-bg)}.chip-med,.risk-med{color:var(--risk-med);background:var(--risk-med-bg)}.chip-low,.risk-low{color:var(--risk-low);background:var(--risk-low-bg)}.chip-accent{color:var(--accent);background:var(--soft)}
+.tag{color:var(--muted);font-size:.72rem}
+
+/* Disclosures: bordered tool panels and inline accent disclosures share one animation (flavour.js). */
+.tools,.evidence{border-block:1px solid var(--line);margin:16px 0;background:transparent}.tools>summary,.evidence>summary{padding:14px 0;font-weight:600;font-size:.87rem}.tool-body{padding:4px 0 22px}
+.nested{margin:20px 0;border:0}.nested>summary{padding:8px 0;font-size:.88rem;font-weight:600;color:var(--accent)}.nested-content{padding:8px 0 10px}
+
+/* Callouts: a warning goes before the step it affects; a note adds context. */
+.warnings{display:grid;gap:10px;margin-bottom:17px}.warnings:empty{display:none}.warning{font-size:.85rem;color:var(--risk-high);line-height:1.65}
+.callout{border-left:3px solid var(--accent);background:var(--soft);padding:12px 16px;border-radius:0 var(--radius) var(--radius) 0;font-size:.92rem}.callout.callout-warning{border-color:var(--risk-high);background:var(--risk-high-bg)}
+
+/* Copy box: literal text with a Copy button; height follows the content up to a scroll limit. */
+.copy-box{margin-top:10px;border:1px solid var(--line);border-radius:var(--radius);background:var(--surface);max-width:100%;overflow:hidden}
+.copy-box.undo{border-left:3px solid var(--risk-med)}
+.copy-head{display:flex;align-items:center;gap:10px;padding:4px 4px 4px 11px;border-bottom:1px solid var(--line);background:var(--bg)}
+.copy-label{margin-right:auto;font:600 .7rem/1.4 var(--font);letter-spacing:.06em;text-transform:uppercase;color:var(--muted);min-width:0;overflow-wrap:anywhere}
+.copy-button{font-size:.75rem;padding:3px 10px;min-height:32px;flex-shrink:0}.copy-button.copied{border-color:var(--accent);background:var(--soft);font-weight:600}
+.copy-status{position:absolute;width:1px;height:1px;overflow:hidden;clip-path:inset(50%)}
+.copy-code{margin:0;padding:9px 11px;font:400 12.5px/1.6 var(--mono);color:var(--text);white-space:pre-wrap;overflow-wrap:anywhere;max-height:21em;overflow:auto}.copy-code code{font:inherit}
+
+/* Tables: line-separated rows, mono figures, horizontal scroll inside the wrapper only. */
+.table-wrap{overflow-x:auto;margin-block:16px}.table{border-collapse:collapse;width:100%;font-size:.88rem}.table th{text-align:left;font-weight:600;font-size:.78rem;color:var(--muted);border-bottom:1px solid var(--line);padding:8px 10px 8px 0}.table td{border-bottom:1px solid var(--line);padding:9px 10px 9px 0;vertical-align:top;overflow-wrap:anywhere}.table .num{font-family:var(--mono);font-variant-numeric:tabular-nums;text-align:right}
+
+/* Procedures: numbered steps with bold lead-ins; multiple actions become lettered substeps. */
+.procedure-list{padding-left:1.5rem;margin:0;display:grid;gap:12px}.procedure-list .procedure-list{margin-top:10px;padding-left:1.5rem;gap:9px}
+.procedure-item{padding-left:3px;overflow-wrap:anywhere}.procedure-item::marker{font:400 .82em var(--mono);color:var(--accent)}.procedure-item>.lead{color:var(--text);font-weight:600}.procedure-item>.instruction{color:var(--muted)}
+.setup-list{padding-left:1.6rem;display:grid;gap:20px;font-size:.91rem;line-height:1.75}.setup-list li{overflow-wrap:anywhere;padding-left:4px}.setup-list li::marker{color:var(--accent);font-weight:600}
+
+/* Figures and the one optional diagram; strokes and fills use tokens so both themes work. */
+figure{margin:24px 0}figcaption{font-size:.78rem;color:var(--muted);margin-top:9px;line-height:1.65}.figure-title{font-size:.8rem;font-weight:600;margin-bottom:10px}
+.flow{width:100%;height:auto;display:block}.flow-narrow{display:none}.flow rect{fill:var(--bg);stroke:var(--muted);stroke-width:1.5}.flow text{fill:var(--text);font:14px var(--font);text-anchor:middle}.flow .emphasis rect{fill:var(--soft);stroke:var(--accent)}.flow .emphasis text{font-weight:600}.flow path{stroke:var(--accent);stroke-width:1.5;fill:none}.flow marker path{fill:var(--accent);stroke:none}
+
+/* Dialogs and footer. */
+dialog{width:min(74ch,calc(100vw - 32px));max-height:calc(100dvh - 32px);border:1px solid var(--line);border-radius:8px;background:var(--surface);color:var(--text);padding:22px}dialog::backdrop{background:#0009}
+dialog textarea{height:50vh;font:12px/1.6 var(--mono);margin-block:15px}.dialog-foot{display:flex;gap:14px;align-items:center;justify-content:space-between}.dialog-foot span{font-size:.83rem;color:var(--muted)}
+.footer{color:var(--muted);font-size:.78rem;padding:14px 0 40px}
+
+/* Phone width: 16px gutter, wrapped top bar, no horizontal page scroll. */
+@media(max-width:600px){.wrap{padding-inline:16px}.overview{padding-top:30px}.bar .wrap{gap:5px;flex-wrap:wrap;min-height:64px}.bar button{font-size:.7rem;padding:.35rem .45rem}.progress span{font-size:.68rem}.theme-control{order:5;margin-left:auto}.theme-control select{min-height:34px}.flow-wide{display:none}.flow-narrow{display:block;max-width:270px;margin-inline:auto}.tag{font-size:.67rem}.copy-code{font-size:12px}}
+@media(prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important;scroll-behavior:auto!important}}
