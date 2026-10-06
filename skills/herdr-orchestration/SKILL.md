@@ -12,25 +12,51 @@ Load and follow the `herdr` skill before issuing Herdr commands. Continue only w
 
 ## Topology
 
-The `herdr` skill governs command mechanics and safety. Where its defaults disagree with this skill — sibling-pane topology, no new tabs, or its `--wait`-at-prompt guidance — this skill wins: an orchestration run is an explicit request for this topology and this dispatch behavior.
+The `herdr` skill governs command mechanics and safety. Where its defaults disagree with this skill — sibling-pane topology, no new tabs, moving the control tower to another workspace, or its `--wait`-at-prompt guidance — this skill wins: an orchestration run is an explicit request for this topology and this dispatch behavior.
 
-Keep the control tower and every worker in the current Herdr workspace. Leave the control-tower pane in its existing tab. Rename that pane and that tab `orchestrator` before creating workers, prefixed with the run's key when another control tower shares the workspace; do not create a new tab for the control tower, and do not add either ID to the cleanup ledger:
+### Home workspace
+
+Every run has one **home** workspace, which holds its control tower and every worker it starts, so the sidebar shows each piece of work in one place:
+
+- **Worktree work** (one ticket or branch in its own Git worktree): home is that worktree's workspace, and it holds nothing but this run.
+- **Cross-worktree work** (a release, a merge train, a UAT walk): home is **repo main**, the workspace on the repo's main checkout, which the sidebar shows as the parent of the repo's worktree group. Find it from any checkout of the repo; when this prints nothing, ask the user which workspace to use:
+
+  ```bash
+  key=$(git rev-parse --path-format=absolute --git-common-dir)
+  herdr workspace list | jq -r --arg k "$key" '.result.workspaces[] | select(.worktree.repo_key == $k and .worktree.is_linked_worktree == false) | .workspace_id'
+  ```
+
+- **Other work** (outside a Git repo, or without a worktree): home is the current workspace.
+
+The binding skill names the kind of work; without one, it is other work. A run whose worktree does not exist yet stays where it started until the worktree exists.
+
+A control tower outside its home moves its own pane there before it creates any worker in that home, as a new tab:
+
+```bash
+herdr pane move "$HERDR_PANE_ID" --new-tab --workspace <home-workspace-id> --label orchestrator --no-focus
+```
+
+The move gives the pane a new ID and closes the old tab when it empties. Read the new IDs from `.result.move_result.pane` (`pane_id`, `tab_id`, `workspace_id`) and use them from then on: `--current` and `$HERDR_PANE_ID` still reach the moved pane, but `$HERDR_WORKSPACE_ID` and `$HERDR_TAB_ID` keep naming the old place, and a tab created with them lands there. The pane's shell keeps its old cwd, so pass the home checkout's path to every `--cwd`. The agent name survives the move, so a supervisor still reaches the tower by name; a `herdr agent wait` running during the move ends with `agent_not_running`, and a new wait by name picks the tower up again.
+
+### Tabs and panes
+
+Rename the control-tower pane and its tab `orchestrator` before creating workers, prefixed with the run's key when another control tower shares the workspace, as several do in repo main. A tower already home keeps its existing tab. Do not add either ID to the cleanup ledger:
 
 ```bash
 herdr pane rename "$HERDR_PANE_ID" orchestrator
-herdr tab rename "$HERDR_TAB_ID" orchestrator
+herdr tab rename "$(herdr pane current --current | jq -r .result.pane.tab_id)" orchestrator
 ```
 
-Create worker tabs in that workspace, group related workstreams in the same tab, and cap each worker tab at four panes:
+Create worker tabs in the home workspace, group related workstreams in the same tab, and cap each worker tab at four panes:
 
 ```bash
-herdr tab create --workspace "$HERDR_WORKSPACE_ID" --cwd "$PWD" --label "<role>" --no-focus
-herdr pane split --pane <worker-pane-id> --direction right --cwd "$PWD" --no-focus
+herdr tab create --workspace <home-workspace-id> --cwd <home-checkout> --label "<role>" --no-focus
+herdr pane split --pane <worker-pane-id> --direction right --cwd <home-checkout> --no-focus
 ```
 
 Read `result.tab` and `result.root_pane` from the create response. `herdr tab create` already returns a `root_pane`, so count it against the cap rather than splitting a spare. Split from a worker pane, never `--current`, which is the control tower. Split a wide pane to the right and a tall one down. Reuse a matching tab this run created while it has capacity; otherwise create another clearly named tab. Never place a worker in a tab belonging to another session.
 
-Give every worker tab and pane a concise role label: `--label` on `herdr tab create`, then `herdr pane rename <pane_id> "<role>"` for each worker pane, including the tab's root pane. Preserve focus in the control-tower pane during background work. Record every tab ID, pane ID, and agent name created during the run, with each worker's workstream, state, literal launch command, and prompt file, each line stamped from `date`, in a ledger file at `${XDG_STATE_HOME:-$HOME/.local/state}/herdr-orchestration/<run-key>.md`, outside the checkout. Rewrite it on every change, and after a context summary read it back rather than trusting memory. This ledger defines the resources eligible for cleanup and the names that `herdr agent prompt` and `herdr agent wait` target. Moving a pane between workspaces changes its ID, so re-read the response and update the ledger after any move.
+Give every worker tab and pane a concise role label: `--label` on `herdr tab create`, then `herdr pane rename <pane_id> "<role>"` for each worker pane, including the tab's root pane. The home workspace already names the work, so the label is the role alone (`tester`, not `ep93-tester`). Preserve focus in the control-tower pane during background work. Record every tab ID, pane ID, and agent name created during the run, with each worker's workstream, state, literal launch command, and prompt file, each line stamped from `date`, in a ledger file at `${XDG_STATE_HOME:-$HOME/.local/state}/herdr-orchestration/<run-key>.md`, outside the checkout. Head it with the home workspace ID and the control tower's current IDs, which are not cleanup entries. Rewrite it on every change, and after a context summary read it back rather than trusting memory. This ledger defines the resources eligible for cleanup and the names that `herdr agent prompt` and `herdr agent wait` target. Moving a pane between workspaces changes its ID, so re-read the response and update the ledger after any move.
 
 ## Worker agent
 
