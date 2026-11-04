@@ -73,6 +73,33 @@ Each section mixes forms. Do not write only bullets:
 - Name files in lowercase with underscores: `weekly_board_check.md`, not `Weekly Board Check.md` or `weekly-board-check.md`.
 - Put the page in the folder its siblings use. Do not create a new folder for one page.
 
+## 8. Obsidian syntax
+
+Use Obsidian Flavored Markdown on top of normal Markdown. `[[wikilinks]]` for notes in the vault (Obsidian tracks renames); `[text](url)` only for external URLs.
+
+```markdown
+[[note_name]]                 link to a note
+[[note_name|shown text]]      link with an alias
+[[note_name#Heading]]         link to a heading ([[#Heading]] in the same note)
+[[note_name#^block-id]]       link to a block (end the paragraph with ^block-id)
+![[note_name]]                embed a note (![[note_name#Heading]] for one section)
+![[image.png|300]]            embed an image at 300 px wide
+![[file.pdf#page=3]]          embed one PDF page
+#tag  #nested/tag             inline tags (letters, digits not first, _ - /)
+```
+
+Callouts hold a warning or key rule that must stand out; use at most one or two per page:
+
+```markdown
+> [!warning] Title
+> Body text. Types: note, tip, info, warning, danger, success, question, todo.
+> [!faq]- folds the callout closed; [!faq]+ starts it open.
+```
+
+Properties are YAML frontmatter at the very top, between `---` lines. `tags` and `aliases` are lists; put tags there rather than inline when they describe the whole page. Other syntax: `==highlight==`, `%%hidden comment%%`, footnotes `[^1]`, math `$...$` and `$$...$$`, and mermaid in a fenced `mermaid` block.
+
+Adapted from `obsidian-markdown` in [kepano/obsidian-skills](https://github.com/kepano/obsidian-skills) (MIT, © 2026 Steph Ango).
+
 ## Don't
 
 - ❌ Open with "Overview" or "Introduction", or with a sentence about the note itself.
@@ -99,3 +126,4 @@ Better:
 3. Is the body under about 350 words, with a mix of paragraphs and bullets?
 4. Are the sources at the end as `[[wikilinks]]`, and is every fact sourced?
 5. Is any fact repeated, stale, guessed or copied from another page?
+6. Read the note back after writing: are the frontmatter, links, embeds and callouts intact and the facts as you wrote them?
