@@ -1,0 +1,6 @@
+interface:
+  display_name: "Write Wiki Pages"
+  short_description: "Short, linked Obsidian wiki pages with an opening summary and sources at the end"
+  default_prompt: "Use $write-wiki-pages to write this vault page."
+policy:
+  allow_implicit_invocation: true

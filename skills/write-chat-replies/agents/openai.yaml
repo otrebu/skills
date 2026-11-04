@@ -1,0 +1,6 @@
+interface:
+  display_name: "Write Chat Replies"
+  short_description: "Skimmable, complete chat replies: summary first, mixed bullets and paragraphs"
+  default_prompt: "Use $write-chat-replies to shape this session's replies."
+policy:
+  allow_implicit_invocation: true

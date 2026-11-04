@@ -26,7 +26,9 @@ Each subfolder is one skill — a `SKILL.md` with YAML frontmatter and a markdow
 | [`tmp-snapshot`](./skills/tmp-snapshot) | Saves slices of the current conversation to `/tmp/<name>.md` and returns the path plus an outline of every header. |
 | [`walkthrough`](./skills/walkthrough) | Presents a list — findings, tasks, options, or a file of items — one at a time for focused interactive review, with `next / back / discuss / edit / skip / goto / find / list / done` controls and a running progress header. |
 | [`work-tree-canvas`](./skills/work-tree-canvas) | Maintains a persistent Obsidian Canvas of your work tree across sessions — adds nodes for new branches, tracks the current 🎯 focus, keeps the layout tidy. |
+| [`write-chat-replies`](./skills/write-chat-replies) | Shapes every chat reply: the smallest complete answer, summary first, one section per topic, a mix of short paragraphs and bullets, numbered steps, bold on key words, emoji as status markers, a diagram only when it helps, and plain literal wording. |
 | [`write-simply`](./skills/write-simply) | Writes plain technical text with literal wording and relaxed sentence rules for descriptions and steps. |
+| [`write-wiki-pages`](./skills/write-wiki-pages) | Writes short Obsidian / LLM-wiki pages: an opening summary with no heading, one topic per section, every listed item covered, a `Don't` section for rules, mermaid where a flow is the point, and sources at the end as `[[wikilinks]]`. Pairs with `maintain-llm-wiki`. |
 
 `my-html-artifact-flavour` is a dependency of other skills: they reach its files at `~/.agents/skills/my-html-artifact-flavour/`, so install it globally (`-g`). It optionally reads `write-simply` for page wording.
 
